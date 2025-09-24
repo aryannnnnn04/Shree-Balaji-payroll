@@ -1,0 +1,909 @@
+{% extends "base.html" %}
+
+{% block title %}{{ worker.name }} - Shree Balaji Centring Works{% endblock %}
+
+{% block content %}
+<div class="worker-details-container">
+    <!-- Header with back button -->
+    <div class="page-header">
+        <button class="btn btn-secondary" onclick="window.location.href='/'">
+            <i class="icon">←</i>
+            Back to Dashboard
+        </button>
+        <div class="header-info">
+            <div class="worker-name-edit">
+                <h1 class="page-title" id="workerNameDisplay">{{ worker.name }}</h1>
+                <input type="text" id="workerNameInput" class="edit-input name-input" value="{{ worker.name }}" style="display: none;">
+                <button class="edit-btn" id="nameEditBtn" onclick="toggleEdit('name')" title="Edit name">
+                    <i class="icon">✏️</i>
+                </button>
+            </div>
+            <div class="worker-wage-edit">
+                <p class="page-subtitle" id="workerWageDisplay">Daily Wage: ₹{{ worker.daily_wage }}</p>
+                <div class="wage-edit-container" style="display: none;">
+                    <span>Daily Wage: ₹</span>
+                    <input type="number" id="workerWageInput" class="edit-input wage-input" value="{{ worker.daily_wage }}" min="0" step="0.01">
+                </div>
+                <button class="edit-btn" id="wageEditBtn" onclick="toggleEdit('wage')" title="Edit wage">
+                    <i class="icon">✏️</i>
+                </button>
+            </div>
+            <div class="edit-actions" id="editActions" style="display: none;">
+                <button class="btn btn-success btn-sm" onclick="saveEdit()">Save</button>
+                <button class="btn btn-secondary btn-sm" onclick="cancelEdit()">Cancel</button>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-primary" onclick="showAttendanceModal()">
+                <i class="icon">✓</i>
+                Mark Attendance
+            </button>
+            <button class="btn btn-warning" onclick="showAdvanceModal()">
+                <i class="icon">💰</i>
+                Give Advance
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="summary-icon present">📅</div>
+            <div class="summary-content">
+                <div class="summary-number">{{ attendance_count }}</div>
+                <div class="summary-label">Days Present</div>
+                <div class="summary-period">This Month</div>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon earned">💸</div>
+            <div class="summary-content">
+                <div class="summary-number">₹{{ total_earned }}</div>
+                <div class="summary-label">Total Earned</div>
+                <div class="summary-period">This Month</div>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon advance">🏦</div>
+            <div class="summary-content">
+                <div class="summary-number">₹{{ total_advance }}</div>
+                <div class="summary-label">Advance Taken</div>
+                <div class="summary-period">This Month</div>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon balance">💰</div>
+            <div class="summary-content">
+                <div class="summary-number">₹{{ balance }}</div>
+                <div class="summary-label">Net Balance</div>
+                <div class="summary-period">To be paid</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Month Navigation -->
+    <div class="month-navigation">
+        <button class="btn btn-outline" onclick="changeMonth(-1)">
+            <i class="icon">←</i>
+            Previous Month
+        </button>
+        <h2 class="current-month" id="currentMonth">{{ current_month }}</h2>
+        <button class="btn btn-outline" onclick="changeMonth(1)">
+            Next Month
+            <i class="icon">→</i>
+        </button>
+    </div>
+
+    <!-- Attendance Heatmap -->
+    <div class="heatmap-section">
+        <div class="heatmap-header">
+            <h3>Attendance Overview</h3>
+            <div class="heatmap-legend">
+                <div class="legend-item">
+                    <div class="legend-color present"></div>
+                    <span>Present</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color half-day"></div>
+                    <span>Half Day</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color absent"></div>
+                    <span>Absent</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color no-data"></div>
+                    <span>No Data</span>
+                </div>
+            </div>
+        </div>
+        <div class="attendance-heatmap" id="attendanceHeatmap">
+            <!-- Heatmap will be generated here -->
+        </div>
+    </div>
+
+    <!-- Records Section -->
+    <div class="records-section">
+        <div class="section-tabs">
+            <button class="tab-btn active" onclick="switchTab('attendance')">Attendance Records</button>
+            <button class="tab-btn" onclick="switchTab('advances')">Advance Records</button>
+            <button class="tab-btn" onclick="switchTab('panchang')">Panchang Calendar</button>
+        </div>
+
+        <!-- Attendance Records -->
+        <div id="attendanceTab" class="tab-content active">
+            <div class="records-container">
+                <div class="records-header">
+                    <h3>Attendance Records</h3>
+                    <div class="records-actions">
+                        <input type="text" id="searchAttendance" placeholder="Search by date..." class="form-input small">
+                    </div>
+                </div>
+                <div class="records-grid" id="attendanceRecords">
+                    <!-- Attendance records will be loaded here -->
+                </div>
+                <div class="empty-state" id="attendanceEmpty" style="display: none;">
+                    <div class="empty-icon">📅</div>
+                    <h3>No Attendance Records</h3>
+                    <p>No attendance records found for this period.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advance Records -->
+        <div id="advancesTab" class="tab-content">
+            <div class="records-container">
+                <div class="records-header">
+                    <h3>Advance Records</h3>
+                    <div class="records-actions">
+                        <input type="text" id="searchAdvances" placeholder="Search by date..." class="form-input small">
+                    </div>
+                </div>
+                <div class="records-grid" id="advanceRecords">
+                    <!-- Advance records will be loaded here -->
+                </div>
+                <div class="empty-state" id="advancesEmpty" style="display: none;">
+                    <div class="empty-icon">💰</div>
+                    <h3>No Advance Records</h3>
+                    <p>No advance records found for this period.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panchang Calendar -->
+        <div id="panchangTab" class="tab-content">
+            <div class="panchang-container">
+                <div class="panchang-header">
+                    <h3>Hindu Calendar (Panchang)</h3>
+                    <div class="panchang-info-card">
+                        <div class="current-panchang" id="currentPanchang">
+                            <!-- Current Panchang info will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="panchang-calendar" id="panchangCalendar">
+                    <!-- Full month Panchang calendar will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mark Attendance Modal -->
+<div class="modal" id="attendanceModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Mark Attendance</h3>
+            <button class="modal-close" onclick="closeModal('attendanceModal')">&times;</button>
+        </div>
+        <form id="attendanceForm">
+            <div class="form-group">
+                <label for="attendanceDate">Date</label>
+                <input type="date" id="attendanceDate" name="date" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="attendanceStatus">Status</label>
+                <select id="attendanceStatus" name="status" class="form-select" required>
+                    <option value="Present">Present</option>
+                    <option value="Absent">Absent</option>
+                    <option value="Half Day">Half Day</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('attendanceModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Mark Attendance</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Give Advance Modal -->
+<div class="modal" id="advanceModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Give Advance</h3>
+            <button class="modal-close" onclick="closeModal('advanceModal')">&times;</button>
+        </div>
+        <form id="advanceForm">
+            <div class="form-group">
+                <label for="advanceDate">Date</label>
+                <input type="date" id="advanceDate" name="date" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="advanceAmount">Amount (₹)</label>
+                <input type="number" id="advanceAmount" name="amount" class="form-input" min="0" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="advanceReason">Reason (Optional)</label>
+                <textarea id="advanceReason" name="reason" class="form-textarea" rows="3" placeholder="Enter reason for advance..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('advanceModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Give Advance</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const workerId = parseInt('{{ worker.id }}');
+let currentYear = new Date().getFullYear();
+let currentMonthNum = new Date().getMonth() + 1;
+let isEditing = false;
+let originalValues = {
+    name: '{{ worker.name }}',
+    wage: parseFloat('{{ worker.daily_wage }}')
+};
+
+// In-place editing functions
+function toggleEdit(field) {
+    if (isEditing) return; // Prevent multiple edits
+    
+    isEditing = true;
+    
+    if (field === 'name') {
+        document.getElementById('workerNameDisplay').style.display = 'none';
+        document.getElementById('workerNameInput').style.display = 'block';
+        document.getElementById('workerNameInput').focus();
+    } else if (field === 'wage') {
+        document.getElementById('workerWageDisplay').style.display = 'none';
+        document.querySelector('.wage-edit-container').style.display = 'flex';
+        document.getElementById('workerWageInput').focus();
+    }
+    
+    // Hide edit buttons and show action buttons
+    document.getElementById('nameEditBtn').style.display = 'none';
+    document.getElementById('wageEditBtn').style.display = 'none';
+    document.getElementById('editActions').style.display = 'flex';
+}
+
+function cancelEdit() {
+    // Reset values
+    document.getElementById('workerNameInput').value = originalValues.name;
+    document.getElementById('workerWageInput').value = originalValues.wage;
+    
+    // Hide inputs and show displays
+    document.getElementById('workerNameDisplay').style.display = 'block';
+    document.getElementById('workerNameInput').style.display = 'none';
+    document.getElementById('workerWageDisplay').style.display = 'block';
+    document.querySelector('.wage-edit-container').style.display = 'none';
+    
+    // Show edit buttons and hide action buttons
+    document.getElementById('nameEditBtn').style.display = 'inline-block';
+    document.getElementById('wageEditBtn').style.display = 'inline-block';
+    document.getElementById('editActions').style.display = 'none';
+    
+    isEditing = false;
+}
+
+async function saveEdit() {
+    const newName = document.getElementById('workerNameInput').value.trim();
+    const newWage = parseFloat(document.getElementById('workerWageInput').value);
+    
+    // Validation
+    if (!newName) {
+        showToast('Worker name cannot be empty', 'error');
+        return;
+    }
+    
+    if (newWage <= 0) {
+        showToast('Daily wage must be greater than 0', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/update_worker/${workerId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: newName,
+                wage: newWage
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Update displays
+            document.getElementById('workerNameDisplay').textContent = newName;
+            document.getElementById('workerWageDisplay').textContent = `Daily Wage: ₹${newWage}`;
+            
+            // Update original values
+            originalValues.name = newName;
+            originalValues.wage = newWage;
+            
+            // Hide inputs and show displays
+            document.getElementById('workerNameDisplay').style.display = 'block';
+            document.getElementById('workerNameInput').style.display = 'none';
+            document.getElementById('workerWageDisplay').style.display = 'block';
+            document.querySelector('.wage-edit-container').style.display = 'none';
+            
+            // Show edit buttons and hide action buttons
+            document.getElementById('nameEditBtn').style.display = 'inline-block';
+            document.getElementById('wageEditBtn').style.display = 'inline-block';
+            document.getElementById('editActions').style.display = 'none';
+            
+            isEditing = false;
+            
+            showToast('Worker details updated successfully', 'success');
+        } else {
+            showToast(result.error, 'error');
+        }
+    } catch (error) {
+        showToast('Error updating worker: ' + error.message, 'error');
+    }
+}
+
+// Set default dates to today
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('attendanceDate').value = today;
+    document.getElementById('advanceDate').value = today;
+    
+    loadAttendanceRecords();
+    loadAdvanceRecords();
+    loadAttendanceHeatmap();
+});
+
+// Load and render attendance heatmap
+async function loadAttendanceHeatmap() {
+    try {
+        const response = await fetch(`/api/worker/${workerId}/attendance?year=${currentYear}&month=${currentMonthNum}`);
+        const attendanceData = await response.json();
+        
+        renderAttendanceHeatmap(attendanceData);
+    } catch (error) {
+        console.error('Error loading attendance heatmap:', error);
+    }
+}
+
+function renderAttendanceHeatmap(attendanceData) {
+    const container = document.getElementById('attendanceHeatmap');
+    const year = currentYear;
+    const month = currentMonthNum;
+    
+    // Get number of days in the month
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const firstDay = new Date(year, month - 1, 1).getDay(); // 0 = Sunday
+    
+    // Create attendance lookup
+    const attendanceLookup = {};
+    attendanceData.forEach(record => {
+        const day = new Date(record.date).getDate();
+        attendanceLookup[day] = record.status;
+    });
+    
+    // Generate calendar grid
+    let html = '<div class="heatmap-calendar">';
+    
+    // Add day headers
+    html += '<div class="heatmap-days">';
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    dayNames.forEach(day => {
+        html += `<div class="day-header">${day}</div>`;
+    });
+    html += '</div>';
+    
+    // Add calendar grid
+    html += '<div class="heatmap-grid">';
+    
+    // Add empty cells for days before month starts
+    for (let i = 0; i < firstDay; i++) {
+        html += '<div class="heatmap-cell empty"></div>';
+    }
+    
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+        const status = attendanceLookup[day];
+        let cellClass = 'heatmap-cell';
+        let title = `${day} - No data`;
+        
+        if (status) {
+            cellClass += ` ${status.toLowerCase().replace(' ', '-')}`;
+            title = `${day} - ${status}`;
+        } else {
+            cellClass += ' no-data';
+        }
+        
+        // Check if it's today
+        const today = new Date();
+        if (year === today.getFullYear() && month === today.getMonth() + 1 && day === today.getDate()) {
+            cellClass += ' today';
+        }
+        
+        html += `<div class="${cellClass}" title="${title}" onclick="selectDay(${day})">${day}</div>`;
+    }
+    
+    html += '</div></div>';
+    
+    container.innerHTML = html;
+}
+
+// Handle day selection in heatmap
+function selectDay(day) {
+    // Always create the date in UTC to avoid timezone bugs
+    // currentMonthNum is 1-indexed, JS months are 0-indexed
+    const date = new Date(Date.UTC(currentYear, currentMonthNum - 1, day));
+    // Format date as YYYY-MM-DD (UTC)
+    const dateString = date.toISOString().split('T')[0];
+
+    console.log(`Selected day ${day}, Date (UTC): ${dateString}`);
+
+    // Set the date in attendance modal and show it
+    document.getElementById('attendanceDate').value = dateString;
+    showAttendanceModal();
+}
+
+// Switch between tabs
+function switchTab(tabName) {
+    // Remove active class from all tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    // Add active class to selected tab
+    const clickedBtn = event.target;
+    clickedBtn.classList.add('active');
+    
+    if (tabName === 'attendance') {
+        document.getElementById('attendanceTab').classList.add('active');
+    } else if (tabName === 'advances') {
+        document.getElementById('advancesTab').classList.add('active');
+    } else if (tabName === 'panchang') {
+        document.getElementById('panchangTab').classList.add('active');
+        loadPanchangCalendar();
+    }
+}
+
+// Load Panchang calendar
+async function loadPanchangCalendar() {
+    try {
+        // Load current Panchang info
+        const panchangResponse = await fetch('/api/panchang');
+        const currentPanchang = await panchangResponse.json();
+        
+        // Load festivals for the month
+        const festivalsResponse = await fetch(`/api/festivals/${currentYear}/${currentMonthNum}`);
+        const festivals = await festivalsResponse.json();
+        
+        renderCurrentPanchang(currentPanchang);
+        renderPanchangCalendar(festivals);
+    } catch (error) {
+        console.error('Error loading Panchang calendar:', error);
+    }
+}
+
+function renderCurrentPanchang(panchang) {
+    const container = document.getElementById('currentPanchang');
+    
+    let html = `
+        <div class="panchang-today">
+            <h4>Today's Panchang</h4>
+            <div class="panchang-details">
+                <div class="panchang-item">
+                    <span class="panchang-label">Hindu Date:</span>
+                    <span class="panchang-value">${panchang.formatted_hindu_date}</span>
+                </div>
+                <div class="panchang-item">
+                    <span class="panchang-label">Tithi:</span>
+                    <span class="panchang-value">${panchang.tithi}</span>
+                </div>
+                <div class="panchang-item">
+                    <span class="panchang-label">Paksha:</span>
+                    <span class="panchang-value">${panchang.paksha}</span>
+                </div>
+                <div class="panchang-item">
+                    <span class="panchang-label">Month:</span>
+                    <span class="panchang-value">${panchang.hindu_month}</span>
+                </div>
+            </div>
+    `;
+    
+    if (panchang.festival) {
+        html += `
+            <div class="festival-today">
+                <h5>🎉 ${panchang.festival.name}</h5>
+                <p>${panchang.festival.significance}</p>
+            </div>
+        `;
+    }
+    
+    if (panchang.is_shraddha) {
+        html += `
+            <div class="shraddha-today">
+                <h5>🙏 Shraddha Period</h5>
+                <p>Auspicious time for ancestral rituals and remembrance</p>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderPanchangCalendar(festivals) {
+    const container = document.getElementById('panchangCalendar');
+    const year = currentYear;
+    const month = currentMonthNum;
+    
+    // Get number of days in the month
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const firstDay = new Date(year, month - 1, 1).getDay();
+    
+    // Create festivals lookup
+    const festivalLookup = {};
+    festivals.forEach(festival => {
+        festivalLookup[festival.day] = festival.festival;
+    });
+    
+    let html = '<div class="panchang-calendar-grid">';
+    
+    // Add day headers
+    html += '<div class="calendar-days">';
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    dayNames.forEach(day => {
+        html += `<div class="calendar-day-header">${day}</div>`;
+    });
+    html += '</div>';
+    
+    // Add calendar grid
+    html += '<div class="calendar-grid">';
+    
+    // Add empty cells for days before month starts
+    for (let i = 0; i < firstDay; i++) {
+        html += '<div class="calendar-cell empty"></div>';
+    }
+    
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+        const festival = festivalLookup[day];
+        let cellClass = 'calendar-cell';
+        
+        // Check if it's today
+        const today = new Date();
+        if (year === today.getFullYear() && month === today.getMonth() + 1 && day === today.getDate()) {
+            cellClass += ' today';
+        }
+        
+        if (festival) {
+            cellClass += ' festival-day';
+        }
+        
+        html += `<div class="${cellClass}">`;
+        html += `<div class="calendar-date">${day}</div>`;
+        
+        if (festival) {
+            html += `<div class="festival-name">${festival.name}</div>`;
+        }
+        
+        html += '</div>';
+    }
+    
+    html += '</div></div>';
+    
+    container.innerHTML = html;
+}
+
+// Change month
+function changeMonth(direction) {
+    currentMonthNum += direction;
+    
+    if (currentMonthNum > 12) {
+        currentMonthNum = 1;
+        currentYear++;
+    } else if (currentMonthNum < 1) {
+        currentMonthNum = 12;
+        currentYear--;
+    }
+    
+    // Update month display
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    document.getElementById('currentMonth').textContent = `${monthNames[currentMonthNum - 1]} ${currentYear}`;
+    
+    // Reload data
+    loadAttendanceRecords();
+    loadAdvanceRecords();
+    loadAttendanceHeatmap();
+}
+
+// Load attendance records
+async function loadAttendanceRecords() {
+    try {
+        const response = await fetch(`/api/worker/${workerId}/attendance?year=${currentYear}&month=${currentMonthNum}`);
+        const records = await response.json();
+        renderAttendanceRecords(records);
+    } catch (error) {
+        showToast('Error loading attendance records: ' + error.message, 'error');
+    }
+}
+
+// Load advance records
+async function loadAdvanceRecords() {
+    try {
+        const response = await fetch(`/api/worker/${workerId}/advances?year=${currentYear}&month=${currentMonthNum}`);
+        const records = await response.json();
+        renderAdvanceRecords(records);
+    } catch (error) {
+        showToast('Error loading advance records: ' + error.message, 'error');
+    }
+}
+
+// Render attendance records
+function renderAttendanceRecords(records) {
+    const container = document.getElementById('attendanceRecords');
+    const emptyState = document.getElementById('attendanceEmpty');
+    
+    if (records.length === 0) {
+        container.style.display = 'none';
+        emptyState.style.display = 'block';
+        return;
+    }
+    
+    container.style.display = 'grid';
+    emptyState.style.display = 'none';
+    
+    container.innerHTML = records.map(record => {
+        // Generate Hindu calendar display
+        let hinduInfo = '';
+        if (record.hindu_date) {
+            hinduInfo = `
+                <div class="hindu-calendar-info">
+                    <span class="tithi-info">${record.hindu_date.paksha}, ${record.hindu_date.tithi}</span>
+                    ${record.hindu_date.festival ? `<span class="festival-badge">🎉 ${record.hindu_date.festival.name}</span>` : ''}
+                    ${record.hindu_date.is_shraddha ? `<span class="shraddha-badge">🙏 Shraddha</span>` : ''}
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="record-card attendance-record">
+                <div class="record-date">
+                    <div class="date-day">${new Date(record.date).getDate()}</div>
+                    <div class="date-month">${new Date(record.date).toLocaleDateString('en-US', {month: 'short'})}</div>
+                </div>
+                <div class="record-content">
+                    <div class="record-title">${record.status}</div>
+                    <div class="record-subtitle">${new Date(record.date).toLocaleDateString()}</div>
+                    ${hinduInfo}
+                    <div class="record-amount">₹${record.wage_earned}</div>
+                </div>
+                <div class="record-status status-${record.status.toLowerCase().replace(' ', '-')}">
+                    ${record.status}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render advance records
+function renderAdvanceRecords(records) {
+    const container = document.getElementById('advanceRecords');
+    const emptyState = document.getElementById('advancesEmpty');
+    
+    if (records.length === 0) {
+        container.style.display = 'none';
+        emptyState.style.display = 'block';
+        return;
+    }
+    
+    container.style.display = 'grid';
+    emptyState.style.display = 'none';
+    
+    container.innerHTML = records.map(record => `
+        <div class="record-card advance-record">
+            <div class="record-date">
+                <div class="date-day">${new Date(record.date).getDate()}</div>
+                <div class="date-month">${new Date(record.date).toLocaleDateString('en-US', {month: 'short'})}</div>
+            </div>
+            <div class="record-content">
+                <div class="record-title">Advance Payment</div>
+                <div class="record-subtitle">${new Date(record.date).toLocaleDateString()}</div>
+                ${record.reason ? `<div class="record-reason">${record.reason}</div>` : ''}
+            </div>
+            <div class="record-amount advance-amount">₹${record.amount}</div>
+        </div>
+    `).join('');
+}
+
+// Show attendance modal
+function showAttendanceModal() {
+    // Set today's date as default
+    const today = new Date().toISOString().split('T')[0];
+    if (!document.getElementById('attendanceDate').value) {
+        document.getElementById('attendanceDate').value = today;
+    }
+    
+    // Show modal using the correct method
+    const modal = document.getElementById('attendanceModal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+// Show advance modal
+function showAdvanceModal() {
+    // Set today's date as default
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('advanceDate').value = today;
+    
+    // Show modal using the correct method
+    const modal = document.getElementById('advanceModal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+// Close modal function
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('show', 'active');
+        document.body.style.overflow = 'auto';
+    }
+}
+
+// Handle attendance form submission
+document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const attendanceData = {
+        worker_id: workerId,
+        date: formData.get('date'),
+        status: formData.get('status')
+    };
+    
+    // Validation
+    if (!attendanceData.date) {
+        showToast('Please select a date', 'error');
+        return;
+    }
+    if (!attendanceData.status) {
+        showToast('Please select attendance status', 'error');
+        return;
+    }
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    try {
+        if (submitBtn) {
+            setLoading(submitBtn, true);
+        }
+        
+        const response = await fetch('/api/mark_attendance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(attendanceData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(result.message, 'success');
+            closeModal('attendanceModal');
+            e.target.reset();
+            await loadAttendanceRecords();
+            await loadAttendanceHeatmap();
+            // Reload page to update summary
+            window.location.reload();
+        } else {
+            showToast(result.error || 'Failed to mark attendance', 'error');
+        }
+    } catch (error) {
+        console.error('Error marking attendance:', error);
+        showToast('Error marking attendance: ' + error.message, 'error');
+    } finally {
+        if (submitBtn) {
+            setLoading(submitBtn, false);
+        }
+    }
+});
+
+// Handle advance form submission
+document.getElementById('advanceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const advanceData = {
+        worker_id: workerId,
+        amount: parseFloat(formData.get('amount')) || 0,
+        date: formData.get('date'),
+        note: formData.get('reason') || ''
+    };
+    
+    // Validation
+    if (!advanceData.date) {
+        showToast('Please select a date', 'error');
+        return;
+    }
+    if (advanceData.amount <= 0) {
+        showToast('Please enter a valid amount greater than 0', 'error');
+        return;
+    }
+    if (advanceData.amount > 50000) {
+        showToast('Advance amount seems too high (max: ₹50,000)', 'error');
+        return;
+    }
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    try {
+        if (submitBtn) {
+            setLoading(submitBtn, true);
+        }
+        
+        const response = await fetch('/api/give_advance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(advanceData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(result.message, 'success');
+            closeModal('advanceModal');
+            e.target.reset();
+            await loadAdvanceRecords();
+            // Reload page to update summary
+            window.location.reload();
+        } else {
+            showToast(result.error || 'Failed to give advance', 'error');
+        }
+    } catch (error) {
+        console.error('Error giving advance:', error);
+        showToast('Error giving advance: ' + error.message, 'error');
+    } finally {
+        if (submitBtn) {
+            setLoading(submitBtn, false);
+        }
+    }
+});
+
+// Search functionality
+document.getElementById('searchAttendance').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const records = document.querySelectorAll('#attendanceRecords .record-card');
+    records.forEach(record => {
+        const text = record.textContent.toLowerCase();
+        record.style.display = text.includes(searchTerm) ? 'flex' : 'none';
+    });
+});
+
+document.getElementById('searchAdvances').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const records = document.querySelectorAll('#advanceRecords .record-card');
+    records.forEach(record => {
+        const text = record.textContent.toLowerCase();
+        record.style.display = text.includes(searchTerm) ? 'flex' : 'none';
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1720 @@
+/* Dashboard Specific Styles */
+:root {
+    /* Additional CSS custom properties to match base template */
+    --border-color: rgba(255, 255, 255, 0.1);
+    --border-radius: 0.5rem;
+    --border-radius-lg: 0.75rem;
+    --text-muted: #94a3b8;
+    --input-bg: #1e293b;
+}
+
+/* Pull-to-refresh */
+.pull-refresh {
+    position: fixed;
+    top: -80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    padding: 1rem 2rem;
+    border-radius: 0 0 1rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    border: 1px solid var(--border-color);
+    border-top: none;
+}
+
+.pull-refresh.show {
+    top: 0;
+}
+
+.pull-refresh.refreshing {
+    top: 20px;
+}
+
+.pull-refresh-icon {
+    font-size: 1.2rem;
+    transition: transform 0.3s ease;
+}
+
+.pull-refresh.refreshing .pull-refresh-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.dashboard-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.dashboard-header {
+    margin-bottom: 2rem;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.header-left h1 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.header-left p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+/* Hindu Calendar Info */
+.hindu-calendar-info {
+    margin-top: 0.75rem;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    opacity: 0.9;
+}
+
+.hindu-date {
+    color: var(--accent-primary);
+    font-weight: 600;
+}
+
+.festival-info {
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+    display: inline-block;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.shraddha-info {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+    display: inline-block;
+    box-shadow: 0 2px 8px rgba(107, 114, 128, 0.3);
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.stat-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--accent-primary);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Interactive stat cards */
+.stat-card.interactive-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.stat-card.interactive-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4);
+    border-color: var(--accent-primary);
+}
+
+.stat-card.interactive-card.active-filter {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3);
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(251, 191, 36, 0.05));
+}
+
+.stat-action {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.stat-card.interactive-card:hover .stat-action {
+    opacity: 1;
+}
+
+.stat-card.interactive-card.active-filter .stat-action {
+    opacity: 1;
+    color: var(--accent-primary);
+    font-weight: 600;
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.stat-icon.primary { background: rgba(249, 115, 22, 0.2); }
+.stat-icon.success { background: rgba(34, 197, 94, 0.2); }
+.stat-icon.warning { background: rgba(251, 191, 36, 0.2); }
+.stat-icon.info { background: rgba(59, 130, 246, 0.2); }
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 0.125rem;
+}
+
+.stat-sublabel {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* Progress Bar for Attendance */
+.stat-progress {
+    margin-top: 0.5rem;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), #fbbf24);
+    border-radius: 4px;
+    transition: width 0.6s ease;
+    width: 0%;
+}
+
+/* Quick Attendance Modal */
+.attendance-date-section {
+    margin-bottom: 1rem;
+}
+
+.attendance-date {
+    background: var(--secondary-bg);
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.attendance-panchang {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(251, 191, 36, 0.1));
+    border: 1px solid rgba(249, 115, 22, 0.2);
+    border-radius: var(--border-radius);
+    padding: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.panchang-info {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.hindu-calendar-label {
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+.festival-highlight {
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: white;
+    padding: 0.5rem;
+    border-radius: var(--border-radius);
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.shraddha-highlight {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: white;
+    padding: 0.5rem;
+    border-radius: var(--border-radius);
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    box-shadow: 0 2px 8px rgba(107, 114, 128, 0.3);
+}
+
+.quick-attendance-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 0.5rem 0;
+}
+
+.attendance-worker {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    background: var(--secondary-bg);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.attendance-worker-info {
+    flex: 1;
+    margin-right: 1rem;
+}
+
+.attendance-worker-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.attendance-worker-wage {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.attendance-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.attendance-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 80px;
+}
+
+.attendance-btn.present {
+    background: #22c55e;
+    color: white;
+}
+
+.attendance-btn.absent {
+    background: #ef4444;
+    color: white;
+}
+
+.attendance-btn.half-day {
+    background: #f59e0b;
+    color: white;
+}
+
+.attendance-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.attendance-btn.active {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+/* Workers Grid */
+.workers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.worker-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.worker-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    border-color: var(--accent-primary);
+}
+
+/* Mobile swipe actions */
+@media (max-width: 768px) {
+    .worker-card {
+        position: relative;
+        transform: translateX(0);
+        transition: transform 0.3s ease;
+        touch-action: pan-y;
+    }
+    
+    .worker-card.swiping {
+        transition: none;
+    }
+    
+    .worker-card.swipe-left {
+        transform: translateX(-80px);
+    }
+    
+    .worker-card.swipe-right {
+        transform: translateX(80px);
+    }
+    
+    .swipe-actions {
+        position: absolute;
+        top: 0;
+        right: -80px;
+        width: 80px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: var(--danger);
+        z-index: 1;
+    }
+    
+    .swipe-actions.left {
+        left: -80px;
+        right: auto;
+        background: var(--accent-primary);
+    }
+    
+    .swipe-action {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .swipe-action:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+}
+
+.worker-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, #fbbf24 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+.avatar-icon {
+    font-size: 1.8rem;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* Status indicator on avatar */
+.status-indicator {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--card-bg);
+}
+
+.status-indicator.on-site {
+    background: #22c55e;
+}
+
+.status-indicator.off-site {
+    background: #64748b;
+}
+
+.worker-info {
+    flex: 1;
+}
+
+.worker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.worker-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    flex: 1;
+}
+
+.worker-status {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.worker-status.on-site {
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.2);
+}
+
+.worker-status.off-site {
+    color: #64748b;
+    background: rgba(100, 116, 139, 0.2);
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.worker-wage {
+    color: var(--accent-primary);
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin: 0 0 1rem 0;
+}
+
+.worker-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.detail-icon {
+    font-size: 1rem;
+    opacity: 0.7;
+}
+
+/* Kebab Menu */
+.worker-actions {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.kebab-menu {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.kebab-menu:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    transform: scale(1.05);
+}
+
+.kebab-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    min-width: 160px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+    z-index: 100;
+    opacity: 0;
+    transform: translateY(-10px);
+    visibility: hidden;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.kebab-dropdown.active {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+}
+
+.kebab-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.kebab-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--accent-primary);
+}
+
+.kebab-item.danger {
+    color: var(--danger);
+}
+
+.kebab-item.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+}
+
+.kebab-icon {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+/* Give Advance Modal */
+.worker-info-display {
+    background: var(--secondary-bg);
+    padding: 0.75rem 1rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    min-height: 80px;
+    transition: all 0.2s ease;
+}
+
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+}
+
+.form-textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--border-radius);
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.btn-icon:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-icon.danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+/* Worker Details Styles */
+.worker-details-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.header-info {
+    flex: 1;
+}
+
+.header-info h1 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.header-info p {
+    margin: 0;
+    color: var(--accent-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+/* In-place editing styles */
+.worker-name-edit, .worker-wage-edit {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.edit-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    font-size: 0.8rem;
+}
+
+.edit-btn:hover {
+    background: rgba(249, 115, 22, 0.2);
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.edit-input {
+    background: var(--input-bg);
+    border: 2px solid var(--accent-primary);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.edit-input:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+}
+
+.name-input {
+    font-size: 2.5rem;
+    font-weight: 700;
+    padding: 0.25rem 0.5rem;
+    background: transparent;
+    border: 2px dashed var(--accent-primary);
+}
+
+.wage-edit-container {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--accent-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.wage-input {
+    font-size: 1.25rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    width: 120px;
+    background: transparent;
+    border: 2px dashed var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.edit-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+/* Attendance Heatmap */
+.heatmap-section {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+}
+
+.heatmap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.heatmap-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.heatmap-legend {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.legend-color.present {
+    background: #22c55e;
+}
+
+.legend-color.half-day {
+    background: #fbbf24;
+}
+
+.legend-color.absent {
+    background: #ef4444;
+}
+
+.legend-color.no-data {
+    background: var(--secondary-bg);
+}
+
+.heatmap-calendar {
+    width: 100%;
+}
+
+.heatmap-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 0.5rem;
+}
+
+.day-header {
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 0.5rem;
+}
+
+.heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.heatmap-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    position: relative;
+}
+
+.heatmap-cell:hover {
+    transform: scale(1.1);
+    z-index: 1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.heatmap-cell.empty {
+    cursor: default;
+    opacity: 0;
+}
+
+.heatmap-cell.no-data {
+    background: var(--secondary-bg);
+    color: var(--text-muted);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.heatmap-cell.present {
+    background: #22c55e;
+    color: white;
+}
+
+.heatmap-cell.absent {
+    background: #ef4444;
+    color: white;
+}
+
+.heatmap-cell.half-day {
+    background: #fbbf24;
+    color: white;
+}
+
+.heatmap-cell.today {
+    border-color: var(--accent-primary);
+    border-width: 2px;
+    font-weight: 700;
+}
+
+.heatmap-cell.today::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 4px;
+    height: 4px;
+    background: white;
+    border-radius: 50%;
+}
+
+/* Panchang Calendar Styles */
+.panchang-container {
+    padding: 1rem;
+}
+
+.panchang-header {
+    margin-bottom: 2rem;
+}
+
+.panchang-header h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.panchang-info-card {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(251, 191, 36, 0.1));
+    border: 1px solid rgba(249, 115, 22, 0.2);
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem;
+}
+
+.panchang-today h4 {
+    margin: 0 0 1rem 0;
+    color: var(--accent-primary);
+    font-size: 1.1rem;
+}
+
+.panchang-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.panchang-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--border-radius);
+}
+
+.panchang-label {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.panchang-value {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.festival-today, .shraddha-today {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: var(--border-radius);
+}
+
+.festival-today {
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: white;
+}
+
+.shraddha-today {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: white;
+}
+
+.festival-today h5, .shraddha-today h5 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+}
+
+.festival-today p, .shraddha-today p {
+    margin: 0;
+    font-size: 0.875rem;
+    opacity: 0.9;
+}
+
+.panchang-calendar-grid {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    margin-bottom: 1rem;
+    background: var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1px;
+}
+
+.calendar-day-header {
+    background: var(--secondary-bg);
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 0.75rem 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.calendar-day-header:first-child {
+    border-top-left-radius: var(--border-radius);
+}
+
+.calendar-day-header:last-child {
+    border-top-right-radius: var(--border-radius);
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1px;
+}
+
+.calendar-cell {
+    background: var(--card-bg);
+    min-height: 80px;
+    padding: 0.5rem;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.calendar-cell:hover {
+    background: var(--secondary-bg);
+}
+
+.calendar-cell.empty {
+    background: transparent;
+}
+
+.calendar-cell.today {
+    background: rgba(249, 115, 22, 0.1);
+    border: 2px solid var(--accent-primary);
+}
+
+.calendar-cell.festival-day {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(249, 115, 22, 0.2));
+}
+
+.calendar-date {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.festival-name {
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    font-weight: 500;
+    line-height: 1.2;
+    background: rgba(249, 115, 22, 0.1);
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(249, 115, 22, 0.2);
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Summary Grid */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.summary-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.summary-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.summary-icon.present { background: rgba(34, 197, 94, 0.2); }
+.summary-icon.earned { background: rgba(249, 115, 22, 0.2); }
+.summary-icon.advance { background: rgba(251, 191, 36, 0.2); }
+.summary-icon.balance { background: rgba(59, 130, 246, 0.2); }
+
+.summary-content {
+    flex: 1;
+}
+
+.summary-number {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+    margin-bottom: 0.25rem;
+}
+
+.summary-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-bottom: 0.125rem;
+}
+
+.summary-period {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Month Navigation */
+.month-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border-color);
+}
+
+.current-month {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    min-width: 200px;
+    text-align: center;
+}
+
+/* Tabs */
+.section-tabs {
+    display: flex;
+    background: var(--secondary-bg);
+    border-radius: var(--border-radius);
+    padding: 0.25rem;
+    margin-bottom: 2rem;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.tab-btn.active {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Records */
+.records-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.records-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.records-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+/* Section Actions - Filter Controls */
+.section-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.form-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    min-width: 150px;
+    cursor: pointer;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.form-input.small {
+    width: 250px;
+}
+
+.records-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.record-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.3s ease;
+}
+
+.record-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateX(4px);
+}
+
+.record-date {
+    text-align: center;
+    padding: 0.5rem;
+    background: var(--secondary-bg);
+    border-radius: var(--border-radius);
+    min-width: 60px;
+}
+
+.date-day {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.date-month {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.record-content {
+    flex: 1;
+}
+
+.record-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.record-subtitle {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.record-reason {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.record-amount {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+}
+
+.advance-amount {
+    color: #fbbf24;
+}
+
+/* Hindu Calendar Info in Records */
+.hindu-calendar-info {
+    margin: 0.5rem 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.tithi-info {
+    font-size: 0.8rem;
+    color: var(--accent-primary);
+    font-weight: 500;
+    background: rgba(249, 115, 22, 0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(249, 115, 22, 0.2);
+}
+
+.festival-badge {
+    font-size: 0.75rem;
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.shraddha-badge {
+    font-size: 0.75rem;
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(107, 114, 128, 0.3);
+}
+
+.record-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--border-radius);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-present {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.status-absent {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.status-half-day {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+}
+
+/* Search Box */
+.search-box {
+    position: relative;
+}
+
+.search-icon {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+}
+
+/* Empty States */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-secondary);
+}
+
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+}
+
+.empty-state p {
+    margin: 0 0 1.5rem 0;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Form Textarea */
+.form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.875rem;
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+/* Form Select */
+.form-select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+/* Mobile-First Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-container,
+    .worker-details-container {
+        padding: 1rem;
+        padding-bottom: 100px; /* Space for mobile navigation */
+    }
+    
+    .header-content,
+    .page-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+    
+    .header-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+    
+    .header-actions .btn {
+        min-height: 48px;
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
+    }
+    
+    .stats-grid,
+    .summary-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    
+    .workers-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .worker-card {
+        padding: 1.25rem;
+        position: relative;
+    }
+    
+    .worker-actions {
+        opacity: 1; /* Always visible on mobile */
+        position: static;
+        margin-top: 1rem;
+        justify-content: space-between;
+    }
+    
+    .btn-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.1rem;
+    }
+    
+    .month-navigation {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+    }
+    
+    .current-month {
+        min-width: auto;
+        font-size: 1.25rem;
+    }
+    
+    .section-tabs {
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .tab-btn {
+        padding: 1rem;
+        font-size: 1rem;
+        border-radius: 0;
+    }
+    
+    .tab-btn:first-child {
+        border-top-left-radius: var(--border-radius);
+        border-top-right-radius: var(--border-radius);
+    }
+    
+    .tab-btn:last-child {
+        border-bottom-left-radius: var(--border-radius);
+        border-bottom-right-radius: var(--border-radius);
+    }
+    
+    .records-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+    
+    .form-input.small {
+        width: 100%;
+    }
+    
+    .record-card {
+        padding: 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .record-date {
+        align-self: flex-start;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    
+    .record-content {
+        flex: 1;
+        width: 100%;
+    }
+    
+    .record-amount {
+        align-self: flex-end;
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-container,
+    .worker-details-container {
+        padding: 0.75rem;
+    }
+    
+    .header-left h1 {
+        font-size: 1.75rem;
+    }
+    
+    .header-actions {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid,
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stat-number,
+    .summary-number {
+        font-size: 1.5rem;
+    }
+    
+    .worker-card {
+        padding: 1rem;
+    }
+    
+    .worker-name {
+        font-size: 1.1rem;
+    }
+    
+    .worker-wage {
+        font-size: 1rem;
+    }
+    
+    .current-month {
+        font-size: 1.1rem;
+    }
+    
+    .modal-content {
+        margin: 1rem;
+        width: calc(100% - 2rem);
+        max-height: calc(100vh - 2rem);
+    }
+    
+    .modal-header h3 {
+        font-size: 1.1rem;
+    }
+    
+    .btn {
+        padding: 1rem;
+        font-size: 1rem;
+        min-height: 48px;
+    }
+}

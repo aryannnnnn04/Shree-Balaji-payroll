@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Shree Balaji Centring Works{% endblock %}
+
+{% block content %}
+<div class="reports-container">
+    <!-- Header Section -->
+    <div class="dashboard-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">Reports & Analytics</h1>
+                <p class="page-subtitle">Generate payroll and attendance reports</p>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-primary" onclick="exportReport('payroll')">
+                    <i class="icon">📊</i>
+                    Export Payroll
+                </button>
+                <button class="btn btn-secondary" onclick="exportReport('attendance')">
+                    <i class="icon">📋</i>
+                    Export Attendance
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Controls -->
+    <div class="report-controls">
+        <div class="form-group">
+            <label for="reportMonth">Month</label>
+            <select id="reportMonth" class="form-select">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="reportYear">Year</label>
+            <select id="reportYear" class="form-select">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="reportType">Report Type</label>
+            <select id="reportType" class="form-select" onchange="generateReport()">
+                <option value="payroll">Payroll Report</option>
+                <option value="attendance">Attendance Report</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="generateReport()">
+            <i class="icon">🔄</i>
+            Generate Report
+        </button>
+    </div>
+
+    <!-- Report Content -->
+    <div class="report-content" id="reportContent">
+        <!-- Report will be loaded here -->
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-section" id="summarySection" style="display: none;">
+        <h3>Summary</h3>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon primary">👥</div>
+                <div class="stat-content">
+                    <div class="stat-number" id="summaryWorkers">0</div>
+                    <div class="stat-label">Total Workers</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon success">💰</div>
+                <div class="stat-content">
+                    <div class="stat-number" id="summaryPayroll">₹0</div>
+                    <div class="stat-label">Total Payroll</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon warning">📤</div>
+                <div class="stat-content">
+                    <div class="stat-number" id="summaryAdvances">₹0</div>
+                    <div class="stat-label">Total Advances</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon info">💵</div>
+                <div class="stat-content">
+                    <div class="stat-number" id="summaryNet">₹0</div>
+                    <div class="stat-label">Net Payable</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.reports-container {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.report-controls {
+    display: flex;
+    gap: 15px;
+    align-items: flex-end;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    flex-wrap: wrap;
+}
+
+.report-controls .form-group {
+    min-width: 150px;
+}
+
+.report-content {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.report-table th,
+.report-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.report-table th {
+    background: var(--primary-color);
+    color: white;
+    font-weight: 600;
+}
+
+.report-table tr:hover {
+    background: var(--hover-bg);
+}
+
+.summary-section {
+    margin-top: 30px;
+}
+
+.summary-section h3 {
+    margin-bottom: 20px;
+    color: var(--text-primary);
+}
+
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color);
+    border-left: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.empty-report {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-report .empty-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+    .report-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .report-controls .form-group {
+        min-width: auto;
+    }
+    
+    .report-table {
+        font-size: 14px;
+    }
+    
+    .report-table th,
+    .report-table td {
+        padding: 8px;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initializeReports();
+});
+
+function initializeReports() {
+    populateDateSelectors();
+    generateReport(); // Generate default report
+}
+
+function populateDateSelectors() {
+    const monthSelect = document.getElementById('reportMonth');
+    const yearSelect = document.getElementById('reportYear');
+    
+    // Populate months
+    const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    months.forEach((month, index) => {
+        const option = document.createElement('option');
+        option.value = index + 1;
+        option.textContent = month;
+        if (index === currentMonth) option.selected = true;
+        monthSelect.appendChild(option);
+    });
+    
+    // Populate years (current year and previous 2 years)
+    for (let year = currentYear; year >= currentYear - 2; year--) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        if (year === currentYear) option.selected = true;
+        yearSelect.appendChild(option);
+    }
+}
+
+async function generateReport() {
+    const reportType = document.getElementById('reportType').value;
+    const month = document.getElementById('reportMonth').value;
+    const year = document.getElementById('reportYear').value;
+    const reportContent = document.getElementById('reportContent');
+    
+    // Show loading
+    showLoading(reportContent);
+    
+    try {
+        let response;
+        if (reportType === 'payroll') {
+            response = await fetch(`/api/reports/payroll?month=${month}&year=${year}`);
+        } else {
+            response = await fetch(`/api/reports/attendance?month=${month}&year=${year}`);
+        }
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch report data');
+        }
+        
+        const data = await response.json();
+        
+        if (reportType === 'payroll') {
+            renderPayrollReport(data);
+        } else {
+            renderAttendanceReport(data);
+        }
+        
+    } catch (error) {
+        showError(reportContent, 'Failed to generate report: ' + error.message);
+    }
+}
+
+function showLoading(container) {
+    container.innerHTML = `
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Generating report...</p>
+        </div>
+    `;
+}
+
+function showError(container, message) {
+    container.innerHTML = `
+        <div class="empty-report">
+            <div class="empty-icon">⚠️</div>
+            <h3>Error</h3>
+            <p>${message}</p>
+        </div>
+    `;
+}
+
+function renderPayrollReport(data) {
+    const reportContent = document.getElementById('reportContent');
+    const summarySection = document.getElementById('summarySection');
+    
+    if (data.workers.length === 0) {
+        reportContent.innerHTML = `
+            <div class="empty-report">
+                <div class="empty-icon">📊</div>
+                <h3>No Payroll Data</h3>
+                <p>No payroll data found for ${data.month} ${data.year}</p>
+            </div>
+        `;
+        summarySection.style.display = 'none';
+        return;
+    }
+    
+    let tableHTML = `
+        <h2>Payroll Report - ${data.month} ${data.year}</h2>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Worker Name</th>
+                    <th>Daily Wage</th>
+                    <th>Present Days</th>
+                    <th>Half Days</th>
+                    <th>Total Days</th>
+                    <th>Gross Salary</th>
+                    <th>Advances</th>
+                    <th>Net Salary</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    data.workers.forEach(worker => {
+        tableHTML += `
+            <tr>
+                <td><strong>${worker.worker_name}</strong></td>
+                <td>₹${worker.daily_wage.toFixed(2)}</td>
+                <td>${worker.present_days}</td>
+                <td>${worker.half_days}</td>
+                <td>${worker.total_days.toFixed(1)}</td>
+                <td>₹${worker.gross_salary.toFixed(2)}</td>
+                <td>₹${worker.advances.toFixed(2)}</td>
+                <td style="color: ${worker.net_salary >= 0 ? 'var(--success-color)' : 'var(--danger-color)'}">
+                    ₹${worker.net_salary.toFixed(2)}
+                </td>
+            </tr>
+        `;
+    });
+    
+    tableHTML += '</tbody></table>';
+    reportContent.innerHTML = tableHTML;
+    
+    // Update summary
+    document.getElementById('summaryWorkers').textContent = data.summary.total_workers;
+    document.getElementById('summaryPayroll').textContent = `₹${data.summary.total_payroll.toFixed(2)}`;
+    document.getElementById('summaryAdvances').textContent = `₹${data.summary.total_advances.toFixed(2)}`;
+    document.getElementById('summaryNet').textContent = `₹${data.summary.total_net.toFixed(2)}`;
+    summarySection.style.display = 'block';
+}
+
+function renderAttendanceReport(data) {
+    const reportContent = document.getElementById('reportContent');
+    const summarySection = document.getElementById('summarySection');
+    
+    if (data.workers.length === 0) {
+        reportContent.innerHTML = `
+            <div class="empty-report">
+                <div class="empty-icon">📋</div>
+                <h3>No Attendance Data</h3>
+                <p>No attendance data found for ${data.month} ${data.year}</p>
+            </div>
+        `;
+        summarySection.style.display = 'none';
+        return;
+    }
+    
+    let tableHTML = `
+        <h2>Attendance Report - ${data.month} ${data.year}</h2>
+        <div style="margin-bottom: 20px;">
+            <p><strong>Total Days:</strong> ${data.summary.total_days} | 
+               <strong>Working Days:</strong> ${data.summary.working_days} | 
+               <strong>Holidays:</strong> ${data.summary.holidays}</p>
+        </div>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Worker Name</th>
+                    <th>Present Days</th>
+                    <th>Half Days</th>
+                    <th>Absent Days</th>
+                    <th>Holidays</th>
+                    <th>Working Days</th>
+                    <th>Attendance %</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    data.workers.forEach(worker => {
+        const attendanceClass = worker.attendance_percentage >= 80 ? 'success' : 
+                               worker.attendance_percentage >= 60 ? 'warning' : 'danger';
+        
+        tableHTML += `
+            <tr>
+                <td><strong>${worker.worker_name}</strong></td>
+                <td>${worker.present_days}</td>
+                <td>${worker.half_days}</td>
+                <td>${worker.absent_days}</td>
+                <td>${worker.holidays}</td>
+                <td>${worker.total_working_days}</td>
+                <td style="color: var(--${attendanceClass}-color)">
+                    <strong>${worker.attendance_percentage}%</strong>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tableHTML += '</tbody></table>';
+    
+    // Add holidays section if any
+    if (data.holidays.length > 0) {
+        tableHTML += `
+            <h3 style="margin-top: 30px;">Holidays in ${data.month} ${data.year}</h3>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Holiday Name</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        data.holidays.forEach(holiday => {
+            const date = new Date(holiday.date);
+            tableHTML += `
+                <tr>
+                    <td>${date.toLocaleDateString()}</td>
+                    <td><strong>${holiday.name}</strong></td>
+                    <td>${holiday.description || holiday.type}</td>
+                </tr>
+            `;
+        });
+        
+        tableHTML += '</tbody></table>';
+    }
+    
+    reportContent.innerHTML = tableHTML;
+    summarySection.style.display = 'none';
+}
+
+async function exportReport(type) {
+    const month = document.getElementById('reportMonth').value;
+    const year = document.getElementById('reportYear').value;
+    
+    try {
+        const response = await fetch(`/api/reports/${type}?month=${month}&year=${year}`);
+        const data = await response.json();
+        
+        // Create CSV content
+        let csvContent = '';
+        
+        if (type === 'payroll') {
+            csvContent = `Payroll Report - ${data.month} ${data.year}\n\n`;
+            csvContent += 'Worker Name,Daily Wage,Present Days,Half Days,Total Days,Gross Salary,Advances,Net Salary\n';
+            
+            data.workers.forEach(worker => {
+                csvContent += `"${worker.worker_name}",${worker.daily_wage},${worker.present_days},${worker.half_days},${worker.total_days},${worker.gross_salary},${worker.advances},${worker.net_salary}\n`;
+            });
+            
+            csvContent += `\nSummary\n`;
+            csvContent += `Total Workers,${data.summary.total_workers}\n`;
+            csvContent += `Total Payroll,${data.summary.total_payroll}\n`;
+            csvContent += `Total Advances,${data.summary.total_advances}\n`;
+            csvContent += `Net Payable,${data.summary.total_net}\n`;
+        } else {
+            csvContent = `Attendance Report - ${data.month} ${data.year}\n\n`;
+            csvContent += 'Worker Name,Present Days,Half Days,Absent Days,Holidays,Working Days,Attendance %\n';
+            
+            data.workers.forEach(worker => {
+                csvContent += `"${worker.worker_name}",${worker.present_days},${worker.half_days},${worker.absent_days},${worker.holidays},${worker.total_working_days},${worker.attendance_percentage}\n`;
+            });
+        }
+        
+        // Download CSV
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${type}_report_${data.month}_${data.year}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} report exported successfully!`);
+        
+    } catch (error) {
+        showToast('Failed to export report: ' + error.message, 'error');
+    }
+}
+</script>
+{% endblock %}

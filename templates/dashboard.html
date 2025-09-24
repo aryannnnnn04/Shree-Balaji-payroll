@@ -1,0 +1,1570 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Shree Balaji Centring Works{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Pull-to-refresh indicator -->
+    <div class="pull-refresh" id="pullRefresh">
+        <div class="pull-refresh-icon">↓</div>
+        <div class="pull-refresh-text">Pull to refresh</div>
+    </div>
+
+    <!-- Header Section -->
+    <div class="dashboard-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">Shree Balaji Centring Works</h1>
+                <p class="page-subtitle">Manage workers and track attendance</p>
+                <div class="hindu-calendar-info" id="hinduCalendarInfo">
+                    <!-- Hindu calendar info will be loaded here -->
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-success" onclick="showQuickAttendanceModal()">
+                    <i class="icon">✓</i>
+                    Mark Today's Attendance
+                </button>
+                <button class="btn btn-primary" onclick="showAddWorkerModal()">
+                    <i class="icon">➕</i>
+                    Add New Worker
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card interactive-card" onclick="filterByTotalWorkers()" title="Click to reset all filters">
+            <div class="stat-icon primary">👥</div>
+            <div class="stat-content">
+                <div class="stat-number" id="totalWorkers">0</div>
+                <div class="stat-label">Total Workers</div>
+                <div class="stat-action">Click to reset filters</div>
+            </div>
+        </div>
+        <div class="stat-card interactive-card" onclick="filterByPresentToday()" title="Click to show only workers present today">
+            <div class="stat-icon success">✓</div>
+            <div class="stat-content">
+                <div class="stat-number" id="presentToday">0</div>
+                <div class="stat-label">Present Today</div>
+                <div class="stat-action">Click to filter present</div>
+            </div>
+        </div>
+        <div class="stat-card interactive-card" onclick="sortByPayroll()" title="Click to sort by highest earners">
+            <div class="stat-icon warning">💰</div>
+            <div class="stat-content">
+                <div class="stat-number" id="totalPayroll">₹0</div>
+                <div class="stat-label">Monthly Payroll</div>
+                <div class="stat-action">Click to sort by earnings</div>
+            </div>
+        </div>
+        <div class="stat-card" title="Average attendance percentage">
+            <div class="stat-icon info">📊</div>
+            <div class="stat-content">
+                <div class="stat-number" id="avgAttendance">0%</div>
+                <div class="stat-label">Avg Attendance</div>
+                <div class="stat-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="attendanceProgress"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workers Section -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Workers</h2>
+            <div class="section-actions">
+                <div class="filter-controls">
+                    <select class="form-select" id="sortBy" onchange="applySorting()">
+                        <option value="name">Sort by Name</option>
+                        <option value="wage-high">Wage: High to Low</option>
+                        <option value="wage-low">Wage: Low to High</option>
+                        <option value="attendance">Most Attendance</option>
+                    </select>
+                    <select class="form-select" id="filterBy" onchange="applyFiltering()">
+                        <option value="all">All Workers</option>
+                        <option value="present">Present Today</option>
+                        <option value="absent">Absent Today</option>
+                        <option value="high-earners">High Earners (₹500+)</option>
+                    </select>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="searchWorkers" placeholder="Search workers..." class="form-input">
+                    <i class="search-icon">🔍</i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workers Grid -->
+        <div class="workers-grid" id="workersGrid">
+            <!-- Workers will be loaded here dynamically -->
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-icon">👥</div>
+            <h3>No Workers Found</h3>
+            <p>Add your first worker to get started with payroll management.</p>
+            <button class="btn btn-primary" onclick="showAddWorkerModal()">Add Worker</button>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Attendance Modal -->
+<div class="modal" id="quickAttendanceModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Mark Today's Attendance</h3>
+            <button class="modal-close" onclick="closeModal('quickAttendanceModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="attendance-date-section">
+                <div class="attendance-date">
+                    <strong>Date: </strong><span id="attendanceDate"></span>
+                </div>
+                <div class="attendance-panchang" id="attendancePanchang">
+                    <!-- Hindu calendar info will be loaded here -->
+                </div>
+            </div>
+            <div class="quick-attendance-list" id="quickAttendanceList">
+                <!-- Workers list will be populated here -->
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('quickAttendanceModal')">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveQuickAttendance()">Save Attendance</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Worker Modal -->
+<div class="modal" id="addWorkerModal">
+    <div class="modal-content modern-modal">
+        <div class="modal-header">
+            <div class="modal-title-section">
+                <div class="modal-icon">👷</div>
+                <div>
+                    <h3>Add New Worker</h3>
+                    <p class="modal-subtitle">Enter worker details to add them to the team</p>
+                </div>
+            </div>
+            <button class="modal-close" onclick="closeModal('addWorkerModal')">&times;</button>
+        </div>
+        <form id="addWorkerForm">
+            <div class="modal-body">
+                <div class="form-group modern-input-group">
+                    <label for="workerName" class="modern-label">
+                        <i class="icon">👤</i>
+                        Worker Name
+                    </label>
+                    <input type="text" id="workerName" name="name" class="form-input modern-input" 
+                           placeholder="Enter full name (e.g., Rajesh Kumar)" required autocomplete="name">
+                    <div class="input-helper">Enter the worker's full name as it should appear on reports</div>
+                </div>
+                
+                <div class="form-group modern-input-group">
+                    <label for="workerWage" class="modern-label">
+                        <i class="icon">💰</i>
+                        Daily Wage
+                    </label>
+                    <div class="input-with-currency">
+                        <span class="currency-symbol">₹</span>
+                        <input type="number" id="workerWage" name="wage" class="form-input modern-input currency-input" 
+                               min="100" max="5000" step="50" placeholder="500" required>
+                    </div>
+                    <div class="input-helper">Recommended range: ₹200 - ₹2000 per day</div>
+                </div>
+                
+                <div class="form-group modern-input-group">
+                    <label for="workerPhone" class="modern-label">
+                        <i class="icon">📱</i>
+                        Phone Number (Optional)
+                    </label>
+                    <input type="tel" id="workerPhone" name="phone" class="form-input modern-input" 
+                           placeholder="+91 98765 43210" pattern="[+]?[0-9\s-()]{10,15}">
+                    <div class="input-helper">For emergency contact and communication</div>
+                </div>
+                
+                <div class="form-group modern-input-group">
+                    <label for="workerStartDate" class="modern-label">
+                        <i class="icon">📅</i>
+                        Start Date
+                    </label>
+                    <input type="date" id="workerStartDate" name="start_date" class="form-input modern-input" required>
+                    <div class="input-helper">When did this worker join?</div>
+                </div>
+            </div>
+            <div class="modal-actions modern-actions">
+                <button type="button" class="btn btn-secondary modern-btn-secondary" onclick="closeModal('addWorkerModal')">
+                    <i class="icon">✕</i>
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary modern-btn-primary">
+                    <i class="icon">✓</i>
+                    Add Worker
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+/* Modern Modal Styles */
+.modern-modal {
+    max-width: 600px;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(255, 255, 255, 0.02) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.modal-title-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.modal-icon {
+    font-size: 32px;
+    background: linear-gradient(135deg, var(--primary-color), var(--success-color));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.modal-subtitle {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 400;
+}
+
+.modern-input-group {
+    margin-bottom: 25px;
+}
+
+.modern-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.modern-label .icon {
+    font-size: 16px;
+    color: var(--primary-color);
+}
+
+.modern-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+}
+
+.modern-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.modern-input::placeholder {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.input-with-currency {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.currency-symbol {
+    position: absolute;
+    left: 16px;
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 16px;
+    z-index: 1;
+}
+
+.currency-input {
+    padding-left: 40px;
+}
+
+.input-helper {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    opacity: 0.8;
+}
+
+.modern-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modern-btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.modern-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.modern-btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--success-color));
+    border: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
+}
+
+.modern-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+}
+
+.modern-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+@media (max-width: 768px) {
+    .modern-modal {
+        max-width: 95vw;
+        margin: 20px;
+    }
+    
+    .modal-title-section {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .modern-actions {
+        flex-direction: column;
+    }
+    
+    .modern-btn-secondary,
+    .modern-btn-primary {
+        justify-content: center;
+        width: 100%;
+    }
+}
+
+/* Quick Attendance Styles */
+.panchang-info {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 15px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.festival-highlight {
+    background: rgba(255, 193, 7, 0.1);
+    border-radius: 6px;
+    padding: 8px;
+    margin-top: 8px;
+    color: var(--warning-color);
+    font-size: 14px;
+}
+
+.shraddha-highlight {
+    background: rgba(108, 117, 125, 0.1);
+    border-radius: 6px;
+    padding: 8px;
+    margin-top: 8px;
+    color: var(--info-color);
+    font-size: 14px;
+}
+
+.attendance-worker {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.attendance-worker:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-2px);
+}
+
+.attendance-worker-info {
+    flex-grow: 1;
+}
+
+.attendance-worker-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.attendance-worker-wage {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.attendance-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.attendance-btn {
+    padding: 8px 16px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 70px;
+    text-align: center;
+}
+
+.attendance-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+}
+
+.attendance-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
+}
+
+.attendance-btn.present.active {
+    background: var(--success-color);
+    border-color: var(--success-color);
+}
+
+.attendance-btn.absent.active {
+    background: var(--danger-color);
+    border-color: var(--danger-color);
+}
+
+.attendance-btn.half-day.active {
+    background: var(--warning-color);
+    border-color: var(--warning-color);
+    color: black;
+}
+
+@media (max-width: 768px) {
+    .attendance-worker {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+        text-align: center;
+    }
+    
+    .attendance-buttons {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .attendance-btn {
+        flex: 1;
+        min-width: 80px;
+    }
+}
+</style>
+
+<!-- Edit Worker Modal -->
+<div class="modal" id="editWorkerModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Worker</h3>
+            <button class="modal-close" onclick="closeModal('editWorkerModal')">&times;</button>
+        </div>
+        <form id="editWorkerForm">
+            <div class="form-group">
+                <label for="editWorkerName">Worker Name</label>
+                <input type="text" id="editWorkerName" name="name" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="editWorkerWage">Daily Wage (₹)</label>
+                <input type="number" id="editWorkerWage" name="wage" class="form-input" min="0" step="0.01" required>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editWorkerModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Worker</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal" id="deleteWorkerModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Delete Worker</h3>
+            <button class="modal-close" onclick="closeModal('deleteWorkerModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete this worker? This action cannot be undone.</p>
+            <p><strong id="deleteWorkerName"></strong></p>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('deleteWorkerModal')">Cancel</button>
+            <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Worker</button>
+        </div>
+    </div>
+</div>
+
+<!-- Give Advance Modal -->
+<div class="modal" id="giveAdvanceModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Give Advance</h3>
+            <button class="modal-close" onclick="closeModal('giveAdvanceModal')">&times;</button>
+        </div>
+        <form id="giveAdvanceForm">
+            <div class="modal-body">
+                <div class="worker-info-display">
+                    <strong>Worker:</strong> <span id="advanceWorkerName"></span>
+                </div>
+                <div class="form-group">
+                    <label for="advanceAmount">Amount (₹)</label>
+                    <input type="number" id="advanceAmount" name="amount" class="form-input" min="0" step="0.01" required placeholder="Enter advance amount">
+                </div>
+                <div class="form-group">
+                    <label for="advanceNote">Note (Optional)</label>
+                    <textarea id="advanceNote" name="note" class="form-textarea" rows="3" placeholder="Reason for advance (e.g., Family emergency, Medical expenses, Rent payment...)"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="advanceDate">Date</label>
+                    <input type="date" id="advanceDate" name="date" class="form-input" required>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('giveAdvanceModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Give Advance</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let workers = [];
+let currentDeleteWorkerId = null;
+
+// Pull-to-refresh functionality
+let pullRefreshStartY = 0;
+let pullRefreshCurrentY = 0;
+let pullRefreshActive = false;
+let pullRefreshThreshold = 80;
+
+function initPullToRefresh() {
+    const pullRefresh = document.getElementById('pullRefresh');
+    const container = document.querySelector('.dashboard-container');
+    
+    container.addEventListener('touchstart', function(e) {
+        if (window.scrollY === 0) {
+            pullRefreshStartY = e.touches[0].clientY;
+            pullRefreshActive = true;
+        }
+    }, { passive: true });
+    
+    container.addEventListener('touchmove', function(e) {
+        if (!pullRefreshActive) return;
+        
+        pullRefreshCurrentY = e.touches[0].clientY;
+        const pullDistance = pullRefreshCurrentY - pullRefreshStartY;
+        
+        if (pullDistance > 0 && window.scrollY === 0) {
+            e.preventDefault();
+            const progress = Math.min(pullDistance / pullRefreshThreshold, 1);
+            const translateY = Math.min(pullDistance * 0.5, pullRefreshThreshold);
+            
+            pullRefresh.style.transform = `translateX(-50%) translateY(${translateY}px)`;
+            
+            if (pullDistance > pullRefreshThreshold) {
+                pullRefresh.classList.add('show');
+                pullRefresh.querySelector('.pull-refresh-text').textContent = 'Release to refresh';
+            } else {
+                pullRefresh.classList.remove('show');
+                pullRefresh.querySelector('.pull-refresh-text').textContent = 'Pull to refresh';
+            }
+        }
+    }, { passive: false });
+    
+    container.addEventListener('touchend', function(e) {
+        if (!pullRefreshActive) return;
+        
+        const pullDistance = pullRefreshCurrentY - pullRefreshStartY;
+        
+        if (pullDistance > pullRefreshThreshold) {
+            triggerRefresh();
+        } else {
+            resetPullRefresh();
+        }
+        
+        pullRefreshActive = false;
+    }, { passive: true });
+}
+
+function triggerRefresh() {
+    const pullRefresh = document.getElementById('pullRefresh');
+    pullRefresh.classList.add('refreshing');
+    pullRefresh.querySelector('.pull-refresh-text').textContent = 'Refreshing...';
+    pullRefresh.querySelector('.pull-refresh-icon').textContent = '⟳';
+    
+    // Perform refresh actions
+    Promise.all([
+        loadWorkers(),
+        loadStats()
+    ]).then(() => {
+        setTimeout(() => {
+            resetPullRefresh();
+            showToast('Data refreshed successfully!', 'success');
+        }, 800);
+    }).catch(() => {
+        resetPullRefresh();
+        showToast('Failed to refresh data', 'error');
+    });
+}
+
+function resetPullRefresh() {
+    const pullRefresh = document.getElementById('pullRefresh');
+    pullRefresh.style.transform = 'translateX(-50%) translateY(-80px)';
+    pullRefresh.classList.remove('show', 'refreshing');
+    pullRefresh.querySelector('.pull-refresh-text').textContent = 'Pull to refresh';
+    pullRefresh.querySelector('.pull-refresh-icon').textContent = '↓';
+}
+
+// Load workers on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadWorkers();
+    loadStats();
+    loadHinduCalendar();
+    initPullToRefresh();
+});
+
+// Load Hindu calendar information
+async function loadHinduCalendar() {
+    try {
+        const response = await fetch('/api/panchang');
+        const panchang = await response.json();
+        
+        const container = document.getElementById('hinduCalendarInfo');
+        if (container && panchang.formatted_hindu_date) {
+            let content = `<span class="hindu-date">Today: ${panchang.formatted_hindu_date}</span>`;
+            
+            // Add festival information if available
+            if (panchang.festival) {
+                content += ` <span class="festival-info">🎉 ${panchang.festival.name}</span>`;
+            }
+            
+            // Add Shraddha period indication
+            if (panchang.is_shraddha) {
+                content += ` <span class="shraddha-info">🙏 Shraddha Period</span>`;
+            }
+            
+            container.innerHTML = content;
+        }
+    } catch (error) {
+        console.error('Error loading Hindu calendar:', error);
+    }
+}
+
+// Load workers from API
+async function loadWorkers() {
+    try {
+        const response = await fetch('/api/workers');
+        workers = await response.json();
+        renderWorkers(workers);
+    } catch (error) {
+        showToast('Error loading workers: ' + error.message, 'error');
+    }
+}
+
+// Load dashboard stats
+async function loadStats() {
+    try {
+        const response = await fetch('/api/stats');
+        const stats = await response.json();
+        
+        document.getElementById('totalWorkers').textContent = stats.total_workers;
+        document.getElementById('presentToday').textContent = stats.present_today;
+        document.getElementById('totalPayroll').textContent = '₹' + stats.total_payroll.toLocaleString();
+        document.getElementById('avgAttendance').textContent = stats.avg_attendance + '%';
+        
+        // Update progress bar
+        const progressFill = document.getElementById('attendanceProgress');
+        if (progressFill) {
+            progressFill.style.width = stats.avg_attendance + '%';
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+// Render workers grid
+function renderWorkers(workersToRender) {
+    const grid = document.getElementById('workersGrid');
+    const emptyState = document.getElementById('emptyState');
+    
+    if (workersToRender.length === 0) {
+        grid.style.display = 'none';
+        emptyState.style.display = 'block';
+        return;
+    }
+    
+    grid.style.display = 'grid';
+    emptyState.style.display = 'none';
+    
+    grid.innerHTML = workersToRender.map(worker => {
+        // Fix data bugs - ensure proper field names and defaults
+        const workerName = worker.name || 'Unknown Worker';
+        const dailyWage = worker.daily_wage || worker.wage || 0;
+        const attendanceCount = worker.attendance_count || 0;
+        const totalEarned = attendanceCount * dailyWage;
+        
+        // Determine live status - green if present today, gray if not
+        const isOnSite = worker.present_today || false;
+        const statusClass = isOnSite ? 'on-site' : 'off-site';
+        const statusText = isOnSite ? 'On-site' : 'Off-site';
+        
+        return `
+        <div class="worker-card" onclick="viewWorker(${worker.id})" data-worker-id="${worker.id}">
+            <div class="worker-avatar">
+                <div class="avatar-icon">👷</div>
+                <div class="status-indicator ${statusClass}" title="${statusText}"></div>
+            </div>
+            <div class="worker-info">
+                <div class="worker-header">
+                    <h3 class="worker-name">${workerName}</h3>
+                    <div class="worker-status ${statusClass}">
+                        <span class="status-dot"></span>
+                        <span class="status-text">${statusText}</span>
+                    </div>
+                </div>
+                <p class="worker-wage">₹${dailyWage.toLocaleString()}/day</p>
+                <div class="worker-details">
+                    <span class="detail-item">
+                        <i class="detail-icon">📅</i>
+                        ${attendanceCount} days present
+                    </span>
+                    <span class="detail-item">
+                        <i class="detail-icon">💰</i>
+                        ₹${totalEarned.toLocaleString()} earned
+                    </span>
+                </div>
+            </div>
+            <div class="worker-actions">
+                <button class="kebab-menu" onclick="event.stopPropagation(); toggleKebabMenu(${worker.id})" title="Options">
+                    ⋮
+                </button>
+                <div class="kebab-dropdown" id="kebab-${worker.id}">
+                    <div class="kebab-item" onclick="event.stopPropagation(); viewWorker(${worker.id})">
+                        <i class="kebab-icon">👁️</i>
+                        View Details
+                    </div>
+                    <div class="kebab-item" onclick="event.stopPropagation(); editWorker(${worker.id})">
+                        <i class="kebab-icon">✏️</i>
+                        Edit Worker
+                    </div>
+                    <div class="kebab-item" onclick="event.stopPropagation(); showGiveAdvanceModal(${worker.id}, '${workerName}')">
+                        <i class="kebab-icon">💰</i>
+                        Give Advance
+                    </div>
+                    <div class="kebab-item danger" onclick="event.stopPropagation(); showDeleteWorkerModal(${worker.id}, '${workerName}')">
+                        <i class="kebab-icon">🗑️</i>
+                        Delete Worker
+                    </div>
+                </div>
+            </div>
+        </div>
+    `}).join('');
+    
+    // Initialize swipe gestures for mobile
+    if (window.innerWidth <= 768) {
+        initSwipeGestures();
+    }
+}
+
+// Apply sorting
+function applySorting() {
+    const sortBy = document.getElementById('sortBy').value;
+    let sortedWorkers = [...workers];
+    
+    switch (sortBy) {
+        case 'name':
+            sortedWorkers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            break;
+        case 'wage-high':
+            sortedWorkers.sort((a, b) => (b.daily_wage || b.wage || 0) - (a.daily_wage || a.wage || 0));
+            break;
+        case 'wage-low':
+            sortedWorkers.sort((a, b) => (a.daily_wage || a.wage || 0) - (b.daily_wage || b.wage || 0));
+            break;
+        case 'attendance':
+            sortedWorkers.sort((a, b) => (b.attendance_count || 0) - (a.attendance_count || 0));
+            break;
+    }
+    
+    renderWorkers(sortedWorkers);
+}
+
+// Apply filtering
+function applyFiltering() {
+    const filterBy = document.getElementById('filterBy').value;
+    let filteredWorkers = [...workers];
+    
+    switch (filterBy) {
+        case 'all':
+            break;
+        case 'present':
+            filteredWorkers = workers.filter(worker => (worker.attendance_count || 0) > 0);
+            break;
+        case 'absent':
+            filteredWorkers = workers.filter(worker => (worker.attendance_count || 0) === 0);
+            break;
+        case 'high-earners':
+            filteredWorkers = workers.filter(worker => (worker.daily_wage || worker.wage || 0) >= 500);
+            break;
+    }
+    
+    renderWorkers(filteredWorkers);
+}
+
+// Toggle kebab menu
+function toggleKebabMenu(workerId) {
+    console.log('Toggling kebab menu for worker:', workerId);
+    const dropdown = document.getElementById(`kebab-${workerId}`);
+    if (!dropdown) {
+        console.error('Dropdown not found for worker:', workerId);
+        return;
+    }
+    
+    const allDropdowns = document.querySelectorAll('.kebab-dropdown');
+    
+    // Close all other dropdowns
+    allDropdowns.forEach(dd => {
+        if (dd.id !== `kebab-${workerId}`) {
+            dd.classList.remove('active');
+        }
+    });
+    
+    // Toggle current dropdown
+    dropdown.classList.toggle('active');
+    
+    // Add haptic feedback
+    if ('vibrate' in navigator) {
+        navigator.vibrate(10);
+    }
+}
+
+// Close kebab menus when clicking outside
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.kebab-menu') && !event.target.closest('.kebab-dropdown')) {
+        document.querySelectorAll('.kebab-dropdown').forEach(dropdown => {
+            dropdown.classList.remove('active');
+        });
+    }
+});
+
+// Interactive stat card functions
+function filterByTotalWorkers() {
+    // Reset all filters
+    document.getElementById('sortBy').value = 'name';
+    document.getElementById('filterBy').value = 'all';
+    document.getElementById('searchWorkers').value = '';
+    
+    // Clear active states
+    document.querySelectorAll('.stat-card.interactive-card').forEach(card => {
+        card.classList.remove('active-filter');
+    });
+    
+    renderWorkers(workers);
+    showToast('Showing all workers', 'info');
+}
+
+function filterByPresentToday() {
+    // Set filter to present workers
+    document.getElementById('filterBy').value = 'present';
+    
+    // Update active state
+    document.querySelectorAll('.stat-card.interactive-card').forEach(card => {
+        card.classList.remove('active-filter');
+    });
+    // Fix: Get the clicked card from the onclick event
+    const clickedCard = event.target.closest('.stat-card');
+    clickedCard.classList.add('active-filter');
+    
+    applySearchAndFilters();
+    showToast('Showing workers present today', 'info');
+}
+
+function sortByPayroll() {
+    // Set sort to highest wage earners
+    document.getElementById('sortBy').value = 'wage-high';
+    
+    // Update active state
+    document.querySelectorAll('.stat-card.interactive-card').forEach(card => {
+        card.classList.remove('active-filter');
+    });
+    // Fix: Get the clicked card from the onclick event
+    const clickedCard = event.target.closest('.stat-card');
+    clickedCard.classList.add('active-filter');
+    
+    applySearchAndFilters();
+    showToast('Sorted by highest earners', 'info');
+}
+
+// Enhanced search with current filters
+function applySearchAndFilters() {
+    const searchTerm = document.getElementById('searchWorkers').value.toLowerCase();
+    const filterBy = document.getElementById('filterBy').value;
+    const sortBy = document.getElementById('sortBy').value;
+    
+    let filteredWorkers = [...workers];
+    
+    // Apply search
+    if (searchTerm) {
+        filteredWorkers = filteredWorkers.filter(worker => 
+            (worker.name || '').toLowerCase().includes(searchTerm)
+        );
+    }
+    
+    // Apply filters
+    switch (filterBy) {
+        case 'present':
+            filteredWorkers = filteredWorkers.filter(worker => (worker.attendance_count || 0) > 0);
+            break;
+        case 'absent':
+            filteredWorkers = filteredWorkers.filter(worker => (worker.attendance_count || 0) === 0);
+            break;
+        case 'high-earners':
+            filteredWorkers = filteredWorkers.filter(worker => (worker.daily_wage || worker.wage || 0) >= 500);
+            break;
+    }
+    
+    // Apply sorting
+    switch (sortBy) {
+        case 'name':
+            filteredWorkers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            break;
+        case 'wage-high':
+            filteredWorkers.sort((a, b) => (b.daily_wage || b.wage || 0) - (a.daily_wage || a.wage || 0));
+            break;
+        case 'wage-low':
+            filteredWorkers.sort((a, b) => (a.daily_wage || a.wage || 0) - (b.daily_wage || b.wage || 0));
+            break;
+        case 'attendance':
+            filteredWorkers.sort((a, b) => (b.attendance_count || 0) - (a.attendance_count || 0));
+            break;
+    }
+    
+    renderWorkers(filteredWorkers);
+}
+
+// Search workers
+document.getElementById('searchWorkers').addEventListener('input', function(e) {
+    applySearchAndFilters();
+});
+
+// Show quick attendance modal
+async function showQuickAttendanceModal() {
+    const today = new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    
+    document.getElementById('attendanceDate').textContent = today;
+    
+    // Load Hindu calendar info for the modal
+    try {
+        const response = await fetch('/api/panchang');
+        const panchang = await response.json();
+        
+        const panchang_container = document.getElementById('attendancePanchang');
+        if (panchang_container && panchang.formatted_hindu_date) {
+            let content = `<div class="panchang-info"><span class="hindu-calendar-label">🗺 Hindu Calendar:</span> ${panchang.formatted_hindu_date}</div>`;
+            
+            if (panchang.festival) {
+                content += `<div class="festival-highlight">🎉 <strong>${panchang.festival.name}</strong> - ${panchang.festival.significance}</div>`;
+            }
+            
+            if (panchang.is_shraddha) {
+                content += `<div class="shraddha-highlight">🙏 <strong>Shraddha Period</strong> - Auspicious for ancestral rituals</div>`;
+            }
+            
+            panchang_container.innerHTML = content;
+        }
+    } catch (error) {
+        console.error('Error loading Panchang for modal:', error);
+    }
+    
+    // Ensure workers are loaded before populating
+    if (workers.length === 0) {
+        await loadWorkers();
+    }
+    
+    attendanceChanges = {};
+    populateQuickAttendance();
+    showModal('quickAttendanceModal');
+}
+
+// --- Stateful Attendance Modal Logic ---
+let attendanceChanges = {};
+function populateQuickAttendance() {
+    const container = document.getElementById('quickAttendanceList');
+    if (workers.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No workers found.</p>';
+        return;
+    }
+    container.innerHTML = workers.map(worker => {
+        const workerName = worker.name || 'Unknown Worker';
+        const dailyWage = worker.daily_wage || worker.wage || 0;
+        const workerId = worker.id;
+        const selected = attendanceChanges[workerId] || '';
+        return `
+            <div class="attendance-worker" data-worker-id="${workerId}">
+                <div class="attendance-worker-info">
+                    <div class="attendance-worker-name">${workerName}</div>
+                    <div class="attendance-worker-wage">₹${dailyWage.toLocaleString()}/day</div>
+                </div>
+                <div class="attendance-buttons">
+                    <button class="attendance-btn present${selected==='Present' ? ' active' : ''}" onclick="selectAttendance(${workerId}, 'Present')">Present</button>
+                    <button class="attendance-btn half-day${selected==='Half Day' ? ' active' : ''}" onclick="selectAttendance(${workerId}, 'Half Day')">Half Day</button>
+                    <button class="attendance-btn absent${selected==='Absent' ? ' active' : ''}" onclick="selectAttendance(${workerId}, 'Absent')">Absent</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function selectAttendance(workerId, status) {
+    // Update state
+    attendanceChanges[workerId] = status;
+    // Update UI
+    populateQuickAttendance();
+}
+
+// Save quick attendance
+async function saveQuickAttendance() {
+    const workerRows = document.querySelectorAll('.attendance-worker');
+    const attendanceData = [];
+    // Fix: Use proper date format for today
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    
+    // Use attendanceChanges for saving
+    Object.entries(attendanceChanges).forEach(([workerId, status]) => {
+        if (status) {
+            attendanceData.push({
+                worker_id: parseInt(workerId),
+                date: todayString,
+                status: status
+            });
+        }
+    });
+    
+    if (attendanceData.length === 0) {
+        showToast('Please mark attendance for at least one worker', 'warning');
+        return;
+    }
+    
+    try {
+        const saveBtn = document.querySelector('#quickAttendanceModal .btn-primary');
+        setLoading(saveBtn, true);
+        
+        // Save all attendance records one by one to ensure proper error handling
+        let successCount = 0;
+        let failureCount = 0;
+        
+        for (const data of attendanceData) {
+            try {
+                const response = await fetch('/api/mark_attendance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    successCount++;
+                } else {
+                    console.error('Failed to save attendance for worker', data.worker_id, ':', result.error);
+                    failureCount++;
+                }
+            } catch (error) {
+                console.error('Error saving attendance for worker', data.worker_id, ':', error);
+                failureCount++;
+            }
+        }
+        
+        if (successCount > 0) {
+            showToast(`Attendance marked for ${successCount} workers`, 'success');
+            if (failureCount > 0) {
+                showToast(`Failed to mark attendance for ${failureCount} workers`, 'warning');
+            }
+        } else {
+            showToast('Failed to mark attendance for all workers', 'error');
+        }
+        
+        closeModal('quickAttendanceModal');
+        
+        // Refresh data
+        await Promise.all([loadWorkers(), loadStats()]);
+        
+    } catch (error) {
+        console.error('Error saving attendance:', error);
+        showToast('Error saving attendance: ' + error.message, 'error');
+    } finally {
+        const saveBtn = document.querySelector('#quickAttendanceModal .btn-primary');
+        if (saveBtn) {
+            setLoading(saveBtn, false);
+        }
+    }
+}
+
+// Show add worker modal
+function showAddWorkerModal() {
+    showModal('addWorkerModal');
+}
+
+// Close modal function (now defined globally)
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('show', 'active');
+        document.body.style.overflow = 'auto';
+        
+        // Clear any form data in modals
+        const forms = modal.querySelectorAll('form');
+        forms.forEach(form => {
+            if (form.id !== 'loginForm') { // Don't reset login form
+                form.reset();
+            }
+        });
+        
+        // Reset any active states
+        const activeButtons = modal.querySelectorAll('.attendance-btn.active');
+        activeButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // Clear attendance selections
+        const workerRows = modal.querySelectorAll('.attendance-worker');
+        workerRows.forEach(row => {
+            row.removeAttribute('data-attendance');
+        });
+    }
+}
+
+// Show modal function (now defined globally)
+function showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+        
+        // Set default date for start date if it's the add worker modal
+        if (modalId === 'addWorkerModal') {
+            const today = new Date().toISOString().split('T')[0];
+            const startDateInput = document.getElementById('workerStartDate');
+            if (startDateInput && !startDateInput.value) {
+                startDateInput.value = today;
+            }
+        }
+        
+        // Auto-focus first input in modal
+        setTimeout(() => {
+            const firstInput = modal.querySelector('input[type="text"], input[type="number"], input[type="email"]');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 100);
+    }
+}
+
+// Handle add worker form
+document.getElementById('addWorkerForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const name = formData.get('name').trim();
+    const wage = parseFloat(formData.get('wage'));
+    const phone = formData.get('phone').trim();
+    const startDate = formData.get('start_date');
+    
+    // Validation
+    if (!name || name.length < 2) {
+        showToast('Please enter a valid worker name (at least 2 characters)', 'error');
+        return;
+    }
+    
+    if (!wage || wage < 100 || wage > 5000) {
+        showToast('Please enter a valid daily wage between ₹100 and ₹5000', 'error');
+        return;
+    }
+    
+    if (!startDate) {
+        showToast('Please select a start date', 'error');
+        return;
+    }
+    
+    // Check if phone number is valid (if provided)
+    if (phone && phone.length > 0) {
+        const phoneRegex = /^[+]?[0-9\s-()]{10,15}$/;
+        if (!phoneRegex.test(phone)) {
+            showToast('Please enter a valid phone number', 'error');
+            return;
+        }
+    }
+    
+    const workerData = {
+        name: name,
+        wage: wage,
+        phone: phone || null,
+        start_date: startDate
+    };
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    try {
+        setLoading(submitBtn, true);
+        
+        const response = await fetch('/api/add_worker', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(workerData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(result.message, 'success');
+            closeModal('addWorkerModal');
+            e.target.reset();
+            loadWorkers();
+            loadStats();
+            
+            // Add celebration effect
+            if ('vibrate' in navigator) {
+                navigator.vibrate([100, 50, 100]);
+            }
+        } else {
+            showToast(result.error, 'error');
+        }
+    } catch (error) {
+        showToast('Error adding worker: ' + error.message, 'error');
+    } finally {
+        setLoading(submitBtn, false);
+    }
+});
+
+// View worker details
+function viewWorker(workerId) {
+    window.location.href = `/worker/${workerId}`;
+}
+
+// Edit worker (now fully implemented)
+let currentEditWorkerId = null;
+
+function editWorker(workerId) {
+    console.log('Editing worker:', workerId);
+    const worker = workers.find(w => w.id === workerId);
+    if (worker) {
+        currentEditWorkerId = workerId;
+        document.getElementById('editWorkerName').value = worker.name || '';
+        document.getElementById('editWorkerWage').value = worker.daily_wage || worker.wage || 0;
+        showModal('editWorkerModal');
+    } else {
+        console.error('Worker not found:', workerId);
+        showToast('Worker not found', 'error');
+    }
+}
+
+// Handle edit worker form
+document.getElementById('editWorkerForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    if (!currentEditWorkerId) {
+        showToast('No worker selected for editing', 'error');
+        return;
+    }
+    
+    const formData = new FormData(e.target);
+    const workerData = {
+        name: formData.get('name')?.trim() || '',
+        wage: parseFloat(formData.get('wage')) || 0
+    };
+    
+    // Validation
+    if (!workerData.name) {
+        showToast('Worker name is required', 'error');
+        return;
+    }
+    if (workerData.wage <= 0) {
+        showToast('Daily wage must be greater than 0', 'error');
+        return;
+    }
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    try {
+        setLoading(submitBtn, true);
+        
+        const response = await fetch(`/api/update_worker/${currentEditWorkerId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(workerData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(result.message, 'success');
+            closeModal('editWorkerModal');
+            await Promise.all([loadWorkers(), loadStats()]);
+        } else {
+            showToast(result.error || 'Failed to update worker', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating worker:', error);
+        showToast('Error updating worker: ' + error.message, 'error');
+    } finally {
+        setLoading(submitBtn, false);
+        currentEditWorkerId = null;
+    }
+});
+
+// Show delete worker modal
+function showDeleteWorkerModal(workerId, workerName) {
+    currentDeleteWorkerId = workerId;
+    document.getElementById('deleteWorkerName').textContent = workerName;
+    showModal('deleteWorkerModal');
+}
+
+// Show give advance modal
+let currentAdvanceWorkerId = null;
+
+function showGiveAdvanceModal(workerId, workerName) {
+    console.log('Showing advance modal for worker:', workerId, workerName);
+    
+    currentAdvanceWorkerId = workerId;
+    const nameElement = document.getElementById('advanceWorkerName');
+    if (nameElement) {
+        nameElement.textContent = workerName || 'Unknown Worker';
+    }
+    
+    // Set today's date as default
+    const today = new Date().toISOString().split('T')[0];
+    const dateInput = document.getElementById('advanceDate');
+    if (dateInput) {
+        dateInput.value = today;
+    }
+    
+    // Clear form
+    const amountInput = document.getElementById('advanceAmount');
+    const noteInput = document.getElementById('advanceNote');
+    if (amountInput) amountInput.value = '';
+    if (noteInput) noteInput.value = '';
+    
+    showModal('giveAdvanceModal');
+}
+
+// Handle give advance form
+document.getElementById('giveAdvanceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    if (!currentAdvanceWorkerId) return;
+    
+    const formData = new FormData(e.target);
+    const advanceData = {
+        worker_id: currentAdvanceWorkerId,
+        amount: parseFloat(formData.get('amount')),
+        note: formData.get('note') || '',
+        date: formData.get('date')
+    };
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    try {
+        setLoading(submitBtn, true);
+        
+        const response = await fetch('/api/give_advance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(advanceData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(result.message, 'success');
+            closeModal('giveAdvanceModal');
+            loadStats(); // Refresh stats if needed
+        } else {
+            showToast(result.error, 'error');
+        }
+    } catch (error) {
+        showToast('Error giving advance: ' + error.message, 'error');
+    } finally {
+        setLoading(submitBtn, false);
+        currentAdvanceWorkerId = null;
+    }
+});
+
+// Handle worker deletion
+document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+    if (!currentDeleteWorkerId) return;
+    
+    try {
+        setLoading(this, true);
+        
+        const response = await fetch(`/api/delete_worker/${currentDeleteWorkerId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(result.message, 'success');
+            closeModal('deleteWorkerModal');
+            loadWorkers();
+            loadStats();
+        } else {
+            showToast(result.error, 'error');
+        }
+    } catch (error) {
+        showToast('Error deleting worker: ' + error.message, 'error');
+    } finally {
+        setLoading(this, false);
+        currentDeleteWorkerId = null;
+    }
+    
+    // Mobile swipe gestures for worker cards
+    function initSwipeGestures() {
+        const workerCards = document.querySelectorAll('.worker-card');
+        
+        workerCards.forEach(card => {
+            let startX = 0;
+            let currentX = 0;
+            let isDragging = false;
+            
+            card.addEventListener('touchstart', function(e) {
+                startX = e.touches[0].clientX;
+                isDragging = true;
+                card.classList.add('swiping');
+            }, { passive: true });
+            
+            card.addEventListener('touchmove', function(e) {
+                if (!isDragging) return;
+                
+                currentX = e.touches[0].clientX;
+                const deltaX = currentX - startX;
+                
+                // Only allow horizontal swipes
+                if (Math.abs(deltaX) > 10) {
+                    e.preventDefault();
+                    
+                    // Limit swipe distance
+                    const maxSwipe = 80;
+                    const swipeDistance = Math.max(-maxSwipe, Math.min(maxSwipe, deltaX));
+                    
+                    card.style.transform = `translateX(${swipeDistance}px)`;
+                    
+                    // Show appropriate action based on swipe direction
+                    if (swipeDistance > 30) {
+                        card.classList.add('swipe-right');
+                        card.classList.remove('swipe-left');
+                    } else if (swipeDistance < -30) {
+                        card.classList.add('swipe-left');
+                        card.classList.remove('swipe-right');
+                    } else {
+                        card.classList.remove('swipe-left', 'swipe-right');
+                    }
+                }
+            }, { passive: false });
+            
+            card.addEventListener('touchend', function(e) {
+                if (!isDragging) return;
+                
+                const deltaX = currentX - startX;
+                isDragging = false;
+                
+                card.classList.remove('swiping');
+                
+                // Trigger action if swipe is significant
+                if (Math.abs(deltaX) > 60) {
+                    if (deltaX > 0) {
+                        // Swipe right - edit action
+                        const workerId = card.dataset.workerId;
+                        editWorker(parseInt(workerId));
+                    } else {
+                        // Swipe left - delete action
+                        const workerId = card.dataset.workerId;
+                        const workerName = card.querySelector('.worker-name').textContent;
+                        showDeleteWorkerModal(parseInt(workerId), workerName);
+                    }
+                }
+                
+                // Reset card position
+                setTimeout(() => {
+                    card.style.transform = 'translateX(0)';
+                    card.classList.remove('swipe-left', 'swipe-right');
+                }, 100);
+            }, { passive: true });
+        });
+    }
+});
+</script>
+{% endblock %}
