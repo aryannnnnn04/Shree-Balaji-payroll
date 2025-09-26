@@ -112,7 +112,14 @@ class Database:
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
                 cursor.execute("SELECT * FROM workers ORDER BY name")
-                return [dict(row) for row in cursor.fetchall()]
+                workers = cursor.fetchall()
+                result = []
+                for row in workers:
+                    worker = dict(row)
+                    if 'daily_wage' in worker:
+                        worker['daily_wage'] = float(worker['daily_wage'])
+                    result.append(worker)
+                return result
         finally: conn.close()
 
     def get_worker(self, worker_id):
@@ -121,7 +128,12 @@ class Database:
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
                 cursor.execute("SELECT * FROM workers WHERE id = %s", (worker_id,))
                 worker = cursor.fetchone()
-                return dict(worker) if worker else None
+                if worker:
+                    result = dict(worker)
+                    if 'daily_wage' in result:
+                        result['daily_wage'] = float(result['daily_wage'])
+                    return result
+                return None
         finally: conn.close()
 
     def mark_attendance(self, worker_id, date_str, status):
@@ -722,13 +734,19 @@ def get_summary(worker_id):
     worker = db.get_worker(worker_id)
     attendance = db.get_attendance(worker_id, year, month)
     advances = db.get_advances(worker_id, year, month)
+    # Ensure attendance is a list
+    if not isinstance(attendance, list):
+        attendance = []
+    if not isinstance(advances, list):
+        advances = []
+        
     present_days = len([a for a in attendance if a['status'] == 'Present'])
     absent_days = len([a for a in attendance if a['status'] == 'Absent'])
     total_working_days = len(attendance)
-    daily_wage_float = float(worker['daily_wage'])
-    total_earnings = present_days * float(daily_wage_float)
-    total_advances = sum(float(a['amount']) for a in advances)
-    net_salary = float(total_earnings) - float(total_advances)
+    daily_wage_float = float(worker.get('daily_wage', 0))
+    total_earnings = present_days * daily_wage_float
+    total_advances = sum(float(a.get('amount', 0)) for a in advances)
+    net_salary = total_earnings - total_advances
     return jsonify({
         'present_days': present_days,
         'absent_days': absent_days,
