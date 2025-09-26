@@ -71,6 +71,28 @@ def login():
     # For now, it just shows the login page
     return render_template('login.html')
 
+@app.route('/dashboard')
+def dashboard():
+    # This is a security check. If a user tries to go to the dashboard
+    # without being logged in, send them back to the login page.
+    if 'user_id' not in session:
+        flash("You must be logged in to view the dashboard.", "danger")
+        return redirect(url_for('login'))
+
+    # If they are logged in, fetch the worker data from the database
+    try:
+        workers = db.get_workers() # Assumes you have a get_workers function in your Database class
+        # You can add more data fetching here if needed
+        
+        # Render the dashboard.html page and send the workers data to it
+        return render_template('dashboard.html', workers=workers, worker_count=len(workers))
+        
+    except Exception as e:
+        # If there's an error fetching data, show an error and stay on the page
+        # or redirect to a safe page like login.
+        flash(f"An error occurred: {e}", "danger")
+        return render_template('dashboard.html', workers=[], worker_count=0)
+
 # --- IMPORTANT ---
 # You will need to add ALL your other Flask routes (@app.route('/dashboard'), etc.) here.
 
