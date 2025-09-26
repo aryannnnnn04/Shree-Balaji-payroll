@@ -12,7 +12,15 @@ import secrets
 # Use persistent disk on Render if available
 DB_PATH = '/data/blazecore_payroll.db' if os.path.exists('/data') else 'blazecore_payroll.db'
 
-app = Flask(__name__)
+import os
+
+# Get the absolute path of the directory where this file is located (the 'api' folder)
+_cwd = os.path.dirname(os.path.abspath(__file__))
+
+# Tell Flask that the templates and static folders are one level up from the 'api' folder
+app = Flask(__name__,
+            static_folder=os.path.join(_cwd, '../static'),
+            template_folder=os.path.join(_cwd, '../templates'))
 app.secret_key = 'shree-balaji-centring-works-secret-key-2024'  # Fixed secret key for session management
 app.config['SESSION_COOKIE_SECURE'] = False  # Allow HTTP for development
 app.config['SESSION_COOKIE_HTTPONLY'] = True
