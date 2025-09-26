@@ -1,4 +1,5 @@
-"""Security testing for login and authentication"""
+with open('test_login.py', 'w', encoding='utf-8') as f:
+    f.write('''"""Security testing for login and authentication"""
 
 import unittest
 from datetime import datetime
@@ -70,6 +71,7 @@ if __name__ == "__main__":
     try:
         unittest.main(verbosity=2)
     except KeyboardInterrupt:
-        print("\nTests interrupted by user")
+        print("\\nTests interrupted by user")
     except Exception as e:
-        print(f"\nTest execution failed: {e}")
+        print(f"\\nTest execution failed: {e}")
+''')

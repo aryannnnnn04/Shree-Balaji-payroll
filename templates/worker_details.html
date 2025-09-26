@@ -635,10 +635,50 @@ function changeMonth(direction) {
 async function loadAttendanceRecords() {
     try {
         const response = await fetch(`/api/worker/${workerId}/attendance?year=${currentYear}&month=${currentMonthNum}`);
-        const records = await response.json();
-        renderAttendanceRecords(records);
+        const data = await response.json();
+        
+        // Check for error response
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Verify we received an array
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid attendance data format received');
+        }
+        
+        renderAttendanceRecords(data);
+        
+        // Clear any previous error messages
+        const errorDiv = document.getElementById('attendance-error-message');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
     } catch (error) {
+        console.error('Error loading attendance records:', error);
         showToast('Error loading attendance records: ' + error.message, 'error');
+        
+        // Show error message in the UI
+        const errorDiv = document.getElementById('attendance-error-message');
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = 'Could not load attendance records. Please try again later.';
+        }
+        
+        // Show empty state with retry button
+        const recordsContainer = document.getElementById('attendanceRecords');
+        if (recordsContainer) {
+            recordsContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <h3>Failed to Load Attendance</h3>
+                    <p>There was a problem loading the attendance records.</p>
+                    <button class="btn btn-primary" onclick="loadAttendanceRecords()">
+                        <i class="fas fa-redo"></i> Try Again
+                    </button>
+                </div>
+            `;
+        }
     }
 }
 
@@ -646,16 +686,79 @@ async function loadAttendanceRecords() {
 async function loadAdvanceRecords() {
     try {
         const response = await fetch(`/api/worker/${workerId}/advances?year=${currentYear}&month=${currentMonthNum}`);
-        const records = await response.json();
-        renderAdvanceRecords(records);
+        const data = await response.json();
+        
+        // Check for error response
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Verify we received an array
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid advance records format received');
+        }
+        
+        renderAdvanceRecords(data);
+        
+        // Clear any previous error messages
+        const errorDiv = document.getElementById('advances-error-message');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
     } catch (error) {
+        console.error('Error loading advance records:', error);
         showToast('Error loading advance records: ' + error.message, 'error');
+        
+        // Show error message in the UI
+        const errorDiv = document.getElementById('advances-error-message');
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = 'Could not load advance records. Please try again later.';
+        }
+        
+        // Show empty state with retry button
+        const recordsContainer = document.getElementById('advanceRecords');
+        if (recordsContainer) {
+            recordsContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <h3>Failed to Load Advances</h3>
+                    <p>There was a problem loading the advance records.</p>
+                    <button class="btn btn-primary" onclick="loadAdvanceRecords()">
+                        <i class="fas fa-redo"></i> Try Again
+                    </button>
+                </div>
+            `;
+        }
+    } finally {
+        // Re-enable any UI elements if needed
     }
 }
 
 // Render attendance records
 function renderAttendanceRecords(records) {
     const container = document.getElementById('attendanceRecords');
+    
+    // Defensive checks
+    if (!container) {
+        console.error('Attendance records container not found');
+        return;
+    }
+    
+    if (!Array.isArray(records)) {
+        console.error('Invalid attendance records format:', records);
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-circle"></i>
+                <h3>Data Error</h3>
+                <p>Invalid attendance data format received.</p>
+                <button class="btn btn-primary" onclick="loadAttendanceRecords()">
+                    <i class="fas fa-redo"></i> Try Again
+                </button>
+            </div>
+        `;
+        return;
+    }
     const emptyState = document.getElementById('attendanceEmpty');
     
     if (records.length === 0) {
@@ -703,6 +806,27 @@ function renderAttendanceRecords(records) {
 // Render advance records
 function renderAdvanceRecords(records) {
     const container = document.getElementById('advanceRecords');
+    
+    // Defensive checks
+    if (!container) {
+        console.error('Advance records container not found');
+        return;
+    }
+    
+    if (!Array.isArray(records)) {
+        console.error('Invalid advance records format:', records);
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-circle"></i>
+                <h3>Data Error</h3>
+                <p>Invalid advance records format received.</p>
+                <button class="btn btn-primary" onclick="loadAdvanceRecords()">
+                    <i class="fas fa-redo"></i> Try Again
+                </button>
+            </div>
+        `;
+        return;
+    }
     const emptyState = document.getElementById('advancesEmpty');
     
     if (records.length === 0) {

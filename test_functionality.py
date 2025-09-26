@@ -1,175 +1,107 @@
-import urllib.request
-import urllib.parse
-import json
-import http.cookiejar
+﻿"""Tests for core functionality of BlazeCore Payroll"""
 
-# Base URL for the application
-BASE_URL = "http://localhost:5001"
+import unittest
+from datetime import datetime, date
+from test_config import TestSession
 
-# Create a cookie jar to maintain session
-cookie_jar = http.cookiejar.CookieJar()
-opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
-
-def test_login():
-    """Test login functionality"""
-    print("Testing login...")
-    try:
-        # Prepare login data
-        login_data = urllib.parse.urlencode({
-            "username": "admin",
-            "password": "shreebalaji2024"
-        }).encode('utf-8')
-        
-        # Create request
-        req = urllib.request.Request(f"{BASE_URL}/login", data=login_data, method='POST')
-        req.add_header('Content-Type', 'application/x-www-form-urlencoded')
-        
-        # Send request
-        response = opener.open(req)
-        
-        if response.getcode() == 302:  # Redirect to dashboard
-            print("✓ Login successful")
-            return True
-        else:
-            print(f"✗ Login failed with status code: {response.getcode()}")
-            return False
-    except Exception as e:
-        print(f"✗ Login failed with error: {str(e)}")
-        return False
-
-def test_dashboard_access():
-    """Test dashboard access"""
-    print("Testing dashboard access...")
-    try:
-        req = urllib.request.Request(BASE_URL)
-        response = opener.open(req)
-        
-        if response.getcode() == 200:
-            print("✓ Dashboard access successful")
-            return True
-        else:
-            print(f"✗ Dashboard access failed with status code: {response.getcode()}")
-            return False
-    except Exception as e:
-        print(f"✗ Dashboard access failed with error: {str(e)}")
-        return False
-
-def test_add_worker():
-    """Test adding a worker"""
-    print("Testing worker creation...")
-    try:
-        # Prepare worker data
+class TestPayrollFunctionality(unittest.TestCase):
+    """Test cases for core payroll functionality"""
+    
+    @classmethod
+    def setUpClass(cls):
+        """Set up test class - run once before all tests"""
+        cls.session = TestSession()
+        success = cls.session.login()
+        if not success:
+            raise RuntimeError("Failed to log in for tests")
+        cls.test_workers = []
+    
+    def setUp(self):
+        """Set up each test"""
+        self.assertTrue(self.session.logged_in, "Test session is not logged in")
+    
+    def test_login_and_dashboard(self):
+        """Test login and dashboard access"""
+        success, response = self.session.request("/dashboard")
+        self.assertTrue(success, "Failed to access dashboard")
+    
+    def test_worker_operations(self):
+        """Test worker creation and management"""
+        # Create test worker data
         worker_data = {
             "name": "Test Worker",
-            "wage": 500,
-            "phone": "9876543210",
-            "start_date": "2025-09-23"
+            "daily_wage": 500.00,
+            "phone": "1234567890",
+            "start_date": datetime.now().strftime("%Y-%m-%d")
         }
         
-        # Convert to JSON and encode
-        json_data = json.dumps(worker_data).encode('utf-8')
+        # Create worker
+        success, response = self.session.request(
+            "/api/workers",
+            method="POST",
+            data=worker_data
+        )
         
-        # Create request
-        req = urllib.request.Request(f"{BASE_URL}/api/add_worker", data=json_data, method='POST')
-        req.add_header('Content-Type', 'application/json')
+        # Verify worker creation
+        self.assertTrue(success, "Failed to create worker")
+        self.assertTrue(response.get("success"), "Worker creation returned error")
+        self.assertIn("worker_id", response, "No worker ID returned")
         
-        # Send request
-        response = opener.open(req)
+        # Store worker ID for cleanup
+        worker_id = response["worker_id"]
+        self.test_workers.append(worker_id)
         
-        if response.getcode() == 200:
-            result = json.loads(response.read().decode('utf-8'))
-            if result.get("success"):
-                print(f"✓ Worker created successfully with ID: {result.get('worker_id')}")
-                return result.get('worker_id')
-            else:
-                print(f"✗ Worker creation failed: {result.get('error')}")
-                return None
-        else:
-            print(f"✗ Worker creation failed with status code: {response.getcode()}")
-            return None
-    except Exception as e:
-        print(f"✗ Worker creation failed with error: {str(e)}")
-        return None
-
-def test_worker_details(worker_id):
-    """Test worker details page"""
-    print(f"Testing worker details page for worker ID: {worker_id}")
-    try:
-        req = urllib.request.Request(f"{BASE_URL}/worker/{worker_id}")
-        response = opener.open(req)
+        # Verify worker exists
+        success, response = self.session.request(f"/api/worker/{worker_id}")
+        self.assertTrue(success, "Failed to fetch worker details")
+        self.assertEqual(response["name"], worker_data["name"], "Worker name mismatch")
+        self.assertEqual(float(response["daily_wage"]), worker_data["daily_wage"], "Worker wage mismatch")
         
-        if response.getcode() == 200:
-            print("✓ Worker details page access successful")
-            return True
-        else:
-            print(f"✗ Worker details page access failed with status code: {response.getcode()}")
-            return False
-    except Exception as e:
-        print(f"✗ Worker details page access failed with error: {str(e)}")
-        return False
-
-def test_mark_attendance(worker_id):
-    """Test marking attendance"""
-    print(f"Testing attendance marking for worker ID: {worker_id}")
-    try:
-        # Prepare attendance data
+        # Test attendance marking
         attendance_data = {
             "worker_id": worker_id,
-            "date": "2025-09-23",
-            "status": "Present"
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "status": "present"
         }
         
-        # Convert to JSON and encode
-        json_data = json.dumps(attendance_data).encode('utf-8')
+        success, response = self.session.request(
+            "/api/attendance",
+            method="POST",
+            data=attendance_data
+        )
         
-        # Create request
-        req = urllib.request.Request(f"{BASE_URL}/api/mark_attendance", data=json_data, method='POST')
-        req.add_header('Content-Type', 'application/json')
+        self.assertTrue(success, "Failed to mark attendance")
+        self.assertTrue(response.get("success"), "Attendance marking returned error")
         
-        # Send request
-        response = opener.open(req)
+        # Test payroll calculation
+        month = datetime.now().month
+        year = datetime.now().year
         
-        if response.getcode() == 200:
-            result = json.loads(response.read().decode('utf-8'))
-            if result.get("success"):
-                print("✓ Attendance marked successfully")
-                return True
-            else:
-                print(f"✗ Attendance marking failed: {result.get('error')}")
-                return False
-        else:
-            print(f"✗ Attendance marking failed with status code: {response.getcode()}")
-            return False
-    except Exception as e:
-        print(f"✗ Attendance marking failed with error: {str(e)}")
-        return False
-
-def main():
-    """Main test function"""
-    print("Starting functionality tests...\n")
+        success, response = self.session.request(
+            f"/api/payroll/{worker_id}/{year}/{month}"
+        )
+        
+        self.assertTrue(success, "Failed to calculate payroll")
+        self.assertIn("total_days", response, "No total days in payroll")
+        self.assertIn("total_pay", response, "No total pay in payroll")
     
-    # Test login
-    if not test_login():
-        return
+    def tearDown(self):
+        """Clean up after each test"""
+        pass
     
-    # Test dashboard access
-    if not test_dashboard_access():
-        return
-    
-    # Test adding worker
-    worker_id = test_add_worker()
-    if not worker_id:
-        return
-    
-    # Test worker details page
-    if not test_worker_details(worker_id):
-        return
-    
-    # Test marking attendance
-    if not test_mark_attendance(worker_id):
-        return
-    
-    print("\n✓ All tests passed!")
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up after all tests"""
+        # Delete test workers
+        for worker_id in cls.test_workers:
+            try:
+                cls.session.request(
+                    f"/api/worker/{worker_id}",
+                    method="DELETE"
+                )
+            except:
+                pass
+        cls.session.cleanup()
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

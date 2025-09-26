@@ -453,9 +453,9 @@ def get_workers_api() -> Response:
         for worker in workers:
             status = attendance_records.get(worker['id'])
             worker['present_today'] = status in ['Present', 'Half Day'] if status else False
-            # Convert Decimal to float for JSON serialization
+            # Convert all numeric fields to float for JSON serialization
             worker['daily_wage'] = float(worker['daily_wage'])
-            worker['wage'] = float(worker['daily_wage'])
+            worker['wage'] = float(worker['daily_wage'])  # Backwards compatibility for older clients
         
         return jsonify(workers)
     except Exception as e:
@@ -465,33 +465,109 @@ def get_workers_api() -> Response:
 @app.route('/api/stats')
 @login_required
 def get_stats():
+    """Get dashboard statistics for workers attendance and payroll.
+    
+    Returns:
+        JSON response containing:
+        - On success: Statistics object with total_workers, present_today, total_payroll, and avg_attendance
+        - On error: Error object with message and appropriate status code
+    """
     try:
+        # Get current date and validate workers
         current_date = date.today()
         workers = db.get_workers()
+        
+        if workers is None:
+            raise ValueError("Failed to retrieve workers from database")
+            
+        if not isinstance(workers, list):
+            raise ValueError("Invalid worker data format received from database")
+        
+        # Initialize statistics
         total_workers = len(workers)
         present_today = 0
-        total_payroll = 0
-        total_attendance_days = 0
+        total_payroll = 0.0
+        total_attendance_days = 0.0
         today_str = current_date.strftime('%Y-%m-%d')
+        
+        # Process each worker
         for worker in workers:
-            attendance = db.get_attendance(worker['id'], current_date.year, current_date.month)
-            if any(record['date'].strftime('%Y-%m-%d') == today_str and record['status'] in ['Present', 'Half Day'] for record in attendance):
-                present_today += 1
-            for record in attendance:
-                # THE FIX: Ensure we are working with floats for calculations
-                daily_wage_float = float(worker['daily_wage'])
-                if record['status'] == 'Present':
-                    total_payroll += daily_wage_float
-                    total_attendance_days += 1
-                elif record['status'] == 'Half Day':
-                    total_payroll += daily_wage_float / 2
-                    total_attendance_days += 0.5
+            try:
+                # Validate worker data
+                if 'id' not in worker:
+                    logger.warning(f"Worker missing ID field: {worker}")
+                    continue
+                    
+                if 'daily_wage' not in worker:
+                    logger.warning(f"Worker {worker.get('id')} missing daily_wage")
+                    continue
+                
+                # Get and validate attendance
+                attendance = db.get_attendance(worker['id'], current_date.year, current_date.month)
+                if attendance is None:
+                    attendance = []
+                
+                if not isinstance(attendance, list):
+                    logger.warning(f"Invalid attendance data for worker {worker['id']}")
+                    continue
+                
+                # Process attendance
+                try:
+                    daily_wage_float = float(worker['daily_wage'])
+                except (TypeError, ValueError):
+                    logger.warning(f"Invalid daily wage for worker {worker['id']}")
+                    continue
+                
+                # Check present today
+                for record in attendance:
+                    try:
+                        record_date = record['date'].strftime('%Y-%m-%d') if hasattr(record['date'], 'strftime') else record['date']
+                        if record_date == today_str and record['status'] in ['Present', 'Half Day']:
+                            present_today += 1
+                            break
+                    except (AttributeError, KeyError, TypeError) as e:
+                        logger.warning(f"Invalid attendance record for worker {worker['id']}: {e}")
+                        continue
+                
+                # Calculate payroll and attendance
+                for record in attendance:
+                    try:
+                        if record['status'] == 'Present':
+                            total_payroll += daily_wage_float
+                            total_attendance_days += 1
+                        elif record['status'] == 'Half Day':
+                            total_payroll += daily_wage_float / 2
+                            total_attendance_days += 0.5
+                    except (KeyError, TypeError) as e:
+                        logger.warning(f"Error processing attendance record: {e}")
+                        continue
+                        
+            except Exception as e:
+                logger.error(f"Error processing worker {worker.get('id', 'unknown')}: {e}")
+                continue
+        
+        # Calculate average attendance
         avg_attendance = 0
         if total_workers > 0 and current_date.day > 0:
-             avg_attendance = round((total_attendance_days / total_workers / current_date.day) * 100)
-             avg_attendance = min(avg_attendance, 100)
-        return jsonify({'total_workers': total_workers, 'present_today': present_today, 'total_payroll': int(total_payroll), 'avg_attendance': avg_attendance})
-    except Exception as e: return jsonify({'error': str(e)}), 500
+            avg_attendance = round((total_attendance_days / total_workers / current_date.day) * 100)
+            avg_attendance = min(avg_attendance, 100)
+        
+        return jsonify({
+            'total_workers': total_workers,
+            'present_today': present_today,
+            'total_payroll': float(total_payroll),  # Convert Decimal to float
+            'avg_attendance': float(avg_attendance)  # Ensure percentage is float
+        })
+        
+    except ValueError as e:
+        # Handle expected errors
+        logger.error(f"Validation error in get_stats: {e}")
+        return jsonify({'error': str(e)}), 400
+        
+    except Exception as e:
+        # Handle unexpected errors
+        logger.error(f"Unexpected error in get_stats: {e}")
+        return jsonify({'error': 'An unexpected error occurred while fetching statistics'}), 500
 
 @app.route('/api/delete_worker/<int:worker_id>', methods=['DELETE'])
 @login_required
@@ -504,24 +580,113 @@ def delete_worker_api(worker_id):
 @app.route('/api/worker/<int:worker_id>/attendance')
 @login_required
 def get_worker_attendance(worker_id):
+    """Get attendance records for a specific worker.
+    
+    Args:
+        worker_id (int): The ID of the worker
+        
+    Query Parameters:
+        year (int): The year to fetch attendance for (default: current year)
+        month (int): The month to fetch attendance for (default: current month)
+        
+    Returns:
+        JSON response containing:
+        - On success: List of attendance records with dates, status, wages earned, and Hindu calendar info
+        - On error: Error object with message and appropriate status code
+    """
     try:
-        year = request.args.get('year', type=int, default=datetime.now().year)
-        month = request.args.get('month', type=int, default=datetime.now().month)
-        attendance = db.get_attendance(worker_id, year, month)
+        # Validate input parameters
+        try:
+            year = request.args.get('year', type=int, default=datetime.now().year)
+            month = request.args.get('month', type=int, default=datetime.now().month)
+            
+            if not (1 <= month <= 12):
+                raise ValueError(f"Invalid month: {month}")
+            if not (2000 <= year <= 2100):
+                raise ValueError(f"Invalid year: {year}")
+                
+        except ValueError as e:
+            return jsonify({'error': f"Invalid date parameters: {str(e)}"}), 400
+        
+        # Get worker details
         worker = db.get_worker(worker_id)
-        daily_wage_float = float(worker['daily_wage'])
+        if not worker:
+            return jsonify({'error': f"Worker not found: {worker_id}"}), 404
+            
+        # Validate worker data
+        if 'daily_wage' not in worker:
+            return jsonify({'error': f"Worker {worker_id} has no daily wage set"}), 400
+            
+        try:
+            daily_wage_float = float(worker['daily_wage'])
+        except (TypeError, ValueError):
+            return jsonify({'error': f"Invalid daily wage for worker {worker_id}"}), 400
+        
+        # Get attendance records
+        attendance = db.get_attendance(worker_id, year, month)
+        if attendance is None:
+            attendance = []
+            
+        if not isinstance(attendance, list):
+            raise ValueError("Invalid attendance data format received from database")
+        
+        # Process each attendance record
+        processed_records = []
         for record in attendance:
-            record['date'] = record['date'].strftime('%Y-%m-%d') 
-            if record['status'] == 'Present':
-                record['wage_earned'] = float(daily_wage_float)
-            elif record['status'] == 'Half Day':
-                record['wage_earned'] = float(daily_wage_float) / 2
-            else:
-                record['wage_earned'] = 0.0
-            panchang = hindu_calendar.get_panchang_summary(datetime.strptime(record['date'], '%Y-%m-%d').date())
-            record['hindu_date'] = panchang
-        return jsonify(attendance)
-    except Exception as e: return jsonify({'error': str(e)}), 500
+            try:
+                # Validate record structure
+                if 'date' not in record or 'status' not in record:
+                    logger.warning(f"Invalid attendance record for worker {worker_id}: {record}")
+                    continue
+                
+                # Format date
+                try:
+                    if isinstance(record['date'], str):
+                        date_obj = datetime.strptime(record['date'], '%Y-%m-%d').date()
+                    else:
+                        date_obj = record['date']
+                    formatted_date = date_obj.strftime('%Y-%m-%d')
+                except (ValueError, AttributeError) as e:
+                    logger.warning(f"Invalid date in attendance record: {e}")
+                    continue
+                
+                # Calculate wages
+                wage_earned = 0.0
+                if record['status'] == 'Present':
+                    wage_earned = daily_wage_float
+                elif record['status'] == 'Half Day':
+                    wage_earned = daily_wage_float / 2
+                
+                # Get Hindu calendar info
+                try:
+                    panchang = hindu_calendar.get_panchang_summary(date_obj)
+                except Exception as e:
+                    logger.warning(f"Error getting panchang for {formatted_date}: {e}")
+                    panchang = None
+                
+                # Create processed record
+                processed_records.append({
+                    'date': formatted_date,
+                    'status': record['status'],
+                    'wage_earned': float(wage_earned),  # Ensure wage is float
+                    'hindu_date': panchang
+                })
+                
+            except Exception as e:
+                logger.error(f"Error processing attendance record: {e}")
+                continue
+        
+        return jsonify(processed_records)
+        
+    except ValueError as e:
+        # Handle expected errors
+        logger.error(f"Validation error in get_worker_attendance: {e}")
+        return jsonify({'error': str(e)}), 400
+        
+    except Exception as e:
+        # Handle unexpected errors
+        logger.error(f"Unexpected error in get_worker_attendance: {e}")
+        return jsonify({'error': 'An unexpected error occurred while fetching attendance records'}), 500
 
 @app.route('/api/worker/<int:worker_id>/advances')
 @login_required
@@ -568,9 +733,9 @@ def get_summary(worker_id):
         'present_days': present_days,
         'absent_days': absent_days,
         'total_working_days': total_working_days,
-        'total_earnings': total_earnings,
-        'total_advances': total_advances,
-        'net_salary': net_salary,
+        'total_earnings': float(total_earnings),  # Convert Decimal to float
+        'total_advances': float(total_advances),  # Convert Decimal to float
+        'net_salary': float(net_salary),         # Convert Decimal to float
         'month_name': calendar.month_name[month],
         'year': year
     })
@@ -680,28 +845,40 @@ def get_payroll_report():
         workers = db.get_workers()
         report_data = []
         total_payroll, total_advances, total_net = 0.0, 0.0, 0.0
+        
         for worker in workers:
+            # Ensure numeric values are converted to float
+            daily_wage = float(worker['daily_wage'])
+            
             attendance = db.get_attendance(worker['id'], year, month)
             advances = db.get_advances(worker['id'], year, month)
+            
+            # Calculate attendance stats
             present_days = len([a for a in attendance if a['status'] == 'Present'])
             half_days = len([a for a in attendance if a['status'] == 'Half Day'])
-            daily_wage_float = float(worker['daily_wage'])
-            gross_salary = (present_days * daily_wage_float) + (half_days * daily_wage_float / 2)
+            total_days = present_days + (half_days * 0.5)
+            
+            # Calculate salary components
+            gross_salary = (present_days * daily_wage) + (half_days * daily_wage / 2)
             worker_advances = sum(float(a['amount']) for a in advances)
             net_salary = gross_salary - worker_advances
+            
+            # Update totals
             total_payroll += gross_salary
             total_advances += worker_advances
             total_net += net_salary
+            
+            # Ensure all numeric values are explicitly converted to float
             report_data.append({
                 'worker_id': worker['id'], 
                 'worker_name': worker['name'], 
-                'daily_wage': daily_wage_float, 
+                'daily_wage': float(daily_wage), 
                 'present_days': present_days, 
                 'half_days': half_days, 
-                'total_days': present_days + (half_days * 0.5), 
-                'gross_salary': gross_salary, 
-                'advances': worker_advances, 
-                'net_salary': net_salary
+                'total_days': float(total_days), 
+                'gross_salary': float(gross_salary), 
+                'advances': float(worker_advances), 
+                'net_salary': float(net_salary)
             })
         return jsonify({
             'month': calendar.month_name[month], 

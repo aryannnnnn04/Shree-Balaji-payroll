@@ -716,10 +716,54 @@ async function loadHinduCalendar() {
 async function loadWorkers() {
     try {
         const response = await fetch('/api/workers');
-        workers = await response.json();
+        const data = await response.json();
+        
+        // Check if we received an error response
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Verify that we received an array of workers
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid data format received from server');
+        }
+        
+        workers = data;
         renderWorkers(workers);
+        
+        // Clear any previous error messages
+        const errorDiv = document.getElementById('error-message');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
     } catch (error) {
+        console.error('Error loading workers:', error);
         showToast('Error loading workers: ' + error.message, 'error');
+        
+        // Show error message in the UI
+        const errorDiv = document.getElementById('error-message');
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = 'Could not load worker data. Please try again later.';
+        }
+        
+        // Show empty state with retry button
+        const grid = document.getElementById('workersGrid');
+        const emptyState = document.getElementById('emptyState');
+        if (grid && emptyState) {
+            grid.style.display = 'none';
+            emptyState.style.display = 'flex';
+            emptyState.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <h3>Failed to Load Data</h3>
+                    <p>There was a problem loading the worker data.</p>
+                    <button class="btn btn-primary" onclick="loadWorkers()">
+                        <i class="fas fa-redo"></i> Try Again
+                    </button>
+                </div>
+            `;
+        }
     }
 }
 
@@ -729,18 +773,60 @@ async function loadStats() {
         const response = await fetch('/api/stats');
         const stats = await response.json();
         
-        document.getElementById('totalWorkers').textContent = stats.total_workers;
-        document.getElementById('presentToday').textContent = stats.present_today;
-        document.getElementById('totalPayroll').textContent = '₹' + stats.total_payroll.toLocaleString();
-        document.getElementById('avgAttendance').textContent = stats.avg_attendance + '%';
+        // Check if we received an error response
+        if (stats.error) {
+            throw new Error(stats.error);
+        }
         
-        // Update progress bar
+        // Verify all required properties exist
+        const requiredProps = ['total_workers', 'present_today', 'total_payroll', 'avg_attendance'];
+        for (const prop of requiredProps) {
+            if (!(prop in stats)) {
+                throw new Error(`Missing required statistic: ${prop}`);
+            }
+        }
+        
+        // Update stats with defensive checks
+        const totalWorkers = document.getElementById('totalWorkers');
+        const presentToday = document.getElementById('presentToday');
+        const totalPayroll = document.getElementById('totalPayroll');
+        const avgAttendance = document.getElementById('avgAttendance');
         const progressFill = document.getElementById('attendanceProgress');
-        if (progressFill) {
-            progressFill.style.width = stats.avg_attendance + '%';
+        
+        if (totalWorkers) totalWorkers.textContent = stats.total_workers;
+        if (presentToday) presentToday.textContent = stats.present_today;
+        if (totalPayroll) totalPayroll.textContent = '₹' + (parseFloat(stats.total_payroll) || 0).toLocaleString();
+        if (avgAttendance) avgAttendance.textContent = (stats.avg_attendance || 0) + '%';
+        if (progressFill) progressFill.style.width = (stats.avg_attendance || 0) + '%';
+        
+        // Clear any previous error messages
+        const errorDiv = document.getElementById('stats-error-message');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
         }
     } catch (error) {
         console.error('Error loading stats:', error);
+        showToast('Error loading statistics: ' + error.message, 'error');
+        
+        // Show error message in the UI
+        const errorDiv = document.getElementById('stats-error-message');
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = 'Could not load statistics. Please try again later.';
+        }
+        
+        // Set default values for stats
+        const elements = ['totalWorkers', 'presentToday', 'avgAttendance'];
+        elements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '-';
+        });
+        
+        const totalPayroll = document.getElementById('totalPayroll');
+        if (totalPayroll) totalPayroll.textContent = '₹0';
+        
+        const progressFill = document.getElementById('attendanceProgress');
+        if (progressFill) progressFill.style.width = '0%';
     }
 }
 
@@ -748,6 +834,32 @@ async function loadStats() {
 function renderWorkers(workersToRender) {
     const grid = document.getElementById('workersGrid');
     const emptyState = document.getElementById('emptyState');
+    
+    // Defensive check for grid element
+    if (!grid) {
+        console.error('Workers grid element not found');
+        return;
+    }
+    
+    // Verify workers array
+    if (!Array.isArray(workersToRender)) {
+        console.error('Invalid workers data:', workersToRender);
+        if (emptyState) {
+            grid.style.display = 'none';
+            emptyState.style.display = 'flex';
+            emptyState.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <h3>Data Error</h3>
+                    <p>Invalid worker data received.</p>
+                    <button class="btn btn-primary" onclick="loadWorkers()">
+                        <i class="fas fa-redo"></i> Try Again
+                    </button>
+                </div>
+            `;
+        }
+        return;
+    }
     
     if (workersToRender.length === 0) {
         grid.style.display = 'none';

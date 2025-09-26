@@ -1,0 +1,130 @@
+/* Mobile-first Layout System */
+:root {
+    /* Add safe area insets for iOS */
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+}
+
+html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevent body-level scrolling */
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--primary-bg) 0%, var(--secondary-bg) 100%);
+}
+
+/* App Layout Structure */
+.app-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+}
+
+/* Header */
+.main-header {
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--primary-bg);
+    padding-top: max(var(--spacing-md), var(--safe-area-inset-top));
+}
+
+/* Main Content Area */
+.main-content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: var(--spacing-md);
+    padding-bottom: max(var(--spacing-md), var(--safe-area-inset-bottom));
+    position: relative;
+}
+
+/* Container */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--spacing-md);
+    width: 100%;
+    height: 100%;
+}
+
+/* Form Layout Improvements */
+.form-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: var(--spacing-md);
+}
+
+.form-section {
+    margin-bottom: var(--spacing-xl);
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--card-bg);
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+    margin: var(--spacing-lg) -var(--spacing-lg) -var(--spacing-lg);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+    .main-content {
+        padding: var(--spacing-sm);
+    }
+    
+    .container {
+        padding: var(--spacing-sm);
+    }
+    
+    .form-container {
+        padding: var(--spacing-sm);
+    }
+    
+    .form-section {
+        padding: var(--spacing-md);
+        margin-bottom: var(--spacing-md);
+    }
+    
+    .form-actions {
+        padding: var(--spacing-sm);
+        margin: var(--spacing-md) -var(--spacing-md) -var(--spacing-md);
+    }
+}
+
+/* iOS PWA Optimizations */
+@supports (padding: max(0px)) {
+    .main-header {
+        padding-top: max(var(--spacing-md), env(safe-area-inset-top));
+    }
+    
+    .main-content {
+        padding-left: max(var(--spacing-md), env(safe-area-inset-left));
+        padding-right: max(var(--spacing-md), env(safe-area-inset-right));
+        padding-bottom: max(var(--spacing-md), env(safe-area-inset-bottom));
+    }
+    
+    .form-actions {
+        padding-bottom: max(var(--spacing-md), env(safe-area-inset-bottom));
+    }
+}

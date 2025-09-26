@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
@@ -20,8 +20,10 @@
     
     <title>{% block title %}Shree Balaji Centring Works - Payroll Management{% endblock %}</title>
     
-    <!-- Dashboard CSS -->
+    <!-- CSS Files -->
     <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='form-fixes.css') }}">
     
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -48,6 +50,13 @@
             /* Additional variables */
             --border-color: rgba(255, 255, 255, 0.1);
             --input-bg: #1e293b;
+            --header-height: 60px;
+            
+            /* Safe Area Insets */
+            --safe-area-inset-top: env(safe-area-inset-top, 0px);
+            --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-area-inset-left: env(safe-area-inset-left, 0px);
+            --safe-area-inset-right: env(safe-area-inset-right, 0px);
             
             /* Spacing */
             --spacing-xs: 0.25rem;
@@ -78,18 +87,47 @@
             box-sizing: border-box;
         }
 
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent body-level scrolling */
+        }
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, var(--primary-bg) 0%, var(--secondary-bg) 100%);
             color: var(--text-primary);
-            min-height: 100vh;
             line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* App Layout Structure */
+        .app-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100%;
+        }
+
+        .main-header {
+            flex-shrink: 0; /* Prevent header from shrinking */
+        }
+
+        .main-content {
+            flex: 1;
+            overflow-y: auto; /* Enable scrolling */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            padding: var(--spacing-md);
+            position: relative;
         }
 
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: var(--spacing-xl);
+            padding: var(--spacing-md);
+            width: 100%;
         }
 
         /* Header Styles */
@@ -631,17 +669,23 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1 class="logo">
-                <i class="fas fa-hard-hat"></i>
-                Shree Balaji Centring Works
-            </h1>
-            <p class="subtitle">Professional Payroll Management</p>
+    <div class="app-wrapper">
+        <!-- Fixed Header -->
+        <header class="main-header">
+            <div class="header">
+                <h1 class="logo">
+                    <i class="fas fa-hard-hat"></i>
+                    Shree Balaji Centring Works
+                </h1>
+                <p class="subtitle">Professional Payroll Management</p>
+            </div>
         </header>
 
-        <main>
-            {% block content %}{% endblock %}
+        <!-- Scrollable Content Area -->
+        <main class="main-content">
+            <div class="container">
+                {% block content %}{% endblock %}
+            </div>
         </main>
         
         <!-- Mobile Bottom Navigation -->

@@ -1,0 +1,53 @@
+/* Form-specific fixes */
+.form-wrapper {
+    padding-bottom: max(var(--spacing-xl), env(safe-area-inset-bottom) + 60px);
+}
+
+.form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-field {
+    margin-bottom: var(--spacing-md);
+}
+
+/* Sticky form actions */
+.form-actions {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--card-bg);
+    padding: var(--spacing-md);
+    margin-top: var(--spacing-xl);
+    border-top: 1px solid var(--border-color);
+    z-index: 10;
+}
+
+/* Add extra padding to bottom of scrollable areas to prevent content from being hidden behind fixed elements */
+.main-content {
+    padding-bottom: max(var(--spacing-xl), env(safe-area-inset-bottom) + 60px);
+}
+
+/* Ensure form fields are easily tappable on mobile */
+@media (max-width: 768px) {
+    .form-input,
+    .form-select,
+    .btn {
+        min-height: 44px; /* iOS minimum tappable area */
+    }
+    
+    .form-label {
+        margin-bottom: var(--spacing-xs);
+        font-size: 0.9rem;
+    }
+    
+    .form-group {
+        margin-bottom: var(--spacing-md);
+    }
+    
+    .form-actions {
+        padding: var(--spacing-sm);
+        padding-bottom: max(var(--spacing-sm), env(safe-area-inset-bottom));
+    }
+}
