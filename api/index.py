@@ -6,6 +6,7 @@ from datetime import datetime, date
 import calendar
 from functools import wraps
 import secrets
+from typing import Optional
 # Assuming hindu_calendar.py is in the 'api' folder and has a HinduCalendar class
 from hindu_calendar import HinduCalendar 
 
