@@ -1,7 +1,7 @@
 ﻿"""Tests for core functionality of BlazeCore Payroll"""
 
 import unittest
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from test_config import TestSession
 from selenium import webdriver
 from selenium.webdriver.common.by import By
