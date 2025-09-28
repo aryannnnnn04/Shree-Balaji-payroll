@@ -50,100 +50,243 @@ class Icons:
 
 class Database:
     """Handles all database operations for the application."""
-    def __init__(self, db_name="blazecore_payroll.db"):
-        self.conn = sqlite3.connect(db_name)
+    _instance = None
+    _connection_pool = {}
+    
+    def __new__(cls, db_name="blazecore_payroll.db"):
+        if cls._instance is None:
+            cls._instance = super(Database, cls).__new__(cls)
+            cls._instance.db_name = db_name
+            cls._instance._init_connection()
+        return cls._instance
+    
+    def _init_connection(self):
+        """Initialize database connection with optimized settings"""
+        self.conn = sqlite3.connect(
+            self.db_name,
+            timeout=30,  # Increased timeout for busy database
+            isolation_level=None  # Enable autocommit mode
+        )
+        # Enable WAL mode for better concurrent access
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        # Optimize for better performance
+        self.conn.execute("PRAGMA synchronous=NORMAL")
+        self.conn.execute("PRAGMA cache_size=10000")
         self.cursor = self.conn.cursor()
         self.create_tables()
 
     def create_tables(self):
         """Create the necessary tables if they don't exist."""
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS workers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                daily_wage REAL NOT NULL
-            )
-        ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS attendance (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                worker_id INTEGER,
-                date TEXT NOT NULL,
-                status TEXT NOT NULL,
-                FOREIGN KEY (worker_id) REFERENCES workers (id),
-                UNIQUE(worker_id, date)
-            )
-        ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS advances (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                worker_id INTEGER,
-                amount REAL NOT NULL,
-                date TEXT NOT NULL,
-                FOREIGN KEY (worker_id) REFERENCES workers (id)
-            )
-        ''')
-        self.conn.commit()
+        with self.conn:  # Use context manager for automatic commit/rollback
+            # Create workers table with indexed name for faster lookups
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS workers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL COLLATE NOCASE,
+                    daily_wage REAL NOT NULL,
+                    active BOOLEAN DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_worker_name ON workers(name)')
+            
+            # Create attendance table with indexes for common queries
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS attendance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    worker_id INTEGER,
+                    date TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (worker_id) REFERENCES workers (id),
+                    UNIQUE(worker_id, date)
+                )
+            ''')
+            self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date)')
+            self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_attendance_worker_date ON attendance(worker_id, date)')
+            
+            # Create advances table with indexes for financial queries
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS advances (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    worker_id INTEGER,
+                    amount REAL NOT NULL,
+                    date TEXT NOT NULL,
+                    notes TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (worker_id) REFERENCES workers (id)
+                )
+            ''')
+            self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_advances_date ON advances(date)')
+            self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_advances_worker_date ON advances(worker_id, date)')
 
     def add_worker(self, name, daily_wage):
         """Add a new worker with validation."""
         if not name or not str(name).strip():
             raise ValueError("Worker name cannot be empty")
-        if daily_wage <= 0:
-            raise ValueError("Daily wage must be greater than 0")
+        if not isinstance(daily_wage, (int, float)) or daily_wage <= 0:
+            raise ValueError("Daily wage must be a positive number")
         
         name = str(name).strip()
         
-        # Check for duplicate names
-        self.cursor.execute("SELECT id FROM workers WHERE LOWER(name) = LOWER(?)", (name,))
-        if self.cursor.fetchone():
-            raise ValueError(f"Worker '{name}' already exists")
+        with self.conn:  # Use context manager for automatic transaction handling
+            # Check for duplicate names using indexed column
+            self.cursor.execute("SELECT id FROM workers WHERE name = ? AND active = 1", (name,))
+            if self.cursor.fetchone():
+                raise ValueError(f"Worker '{name}' already exists")
             
-        self.cursor.execute("INSERT INTO workers (name, daily_wage) VALUES (?, ?)", (name, daily_wage))
-        self.conn.commit()
-        return self.cursor.lastrowid
+            # Insert new worker with current timestamp
+            self.cursor.execute(
+                "INSERT INTO workers (name, daily_wage, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                (name, daily_wage)
+            )
+            return self.cursor.lastrowid
 
-    def get_workers(self):
-        self.cursor.execute("SELECT * FROM workers ORDER BY name")
-        return self.cursor.fetchall()
+    def get_workers(self, active_only=True):
+        """Get all workers with optional filtering."""
+        query = """
+            SELECT id, name, daily_wage, created_at 
+            FROM workers 
+            WHERE active = ? 
+            ORDER BY name
+        """
+        self.cursor.execute(query, (1 if active_only else 0,))
+        return [dict(zip(['id', 'name', 'daily_wage', 'created_at'], row)) 
+                for row in self.cursor.fetchall()]
 
     def mark_attendance(self, worker_id, date_str, status):
-        self.cursor.execute("SELECT id FROM attendance WHERE worker_id = ? AND date(date) = ?", (worker_id, date_str))
-        record = self.cursor.fetchone()
-        if status == 'unmarked':
-            if record:
-                self.cursor.execute("DELETE FROM attendance WHERE id = ?", (record[0],))
-        else:
-            if record:
-                self.cursor.execute("UPDATE attendance SET status = ? WHERE id = ?", (status, record[0]))
+        """Mark or update worker attendance with improved error handling."""
+        valid_statuses = {'present', 'absent', 'half-day', 'unmarked'}
+        if status not in valid_statuses:
+            raise ValueError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+            
+        with self.conn:  # Use transaction
+            # First verify worker exists and is active
+            self.cursor.execute("SELECT 1 FROM workers WHERE id = ? AND active = 1", (worker_id,))
+            if not self.cursor.fetchone():
+                raise ValueError("Worker not found or inactive")
+            
+            if status == 'unmarked':
+                self.cursor.execute(
+                    "DELETE FROM attendance WHERE worker_id = ? AND date(date) = ?",
+                    (worker_id, date_str)
+                )
             else:
-                self.cursor.execute("INSERT INTO attendance (worker_id, date, status) VALUES (?, ?, ?)", (worker_id, date_str, status))
-        self.conn.commit()
+                # Use UPSERT for cleaner code and better performance
+                self.cursor.execute("""
+                    INSERT INTO attendance (worker_id, date, status, created_at) 
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(worker_id, date) 
+                    DO UPDATE SET status = excluded.status, created_at = CURRENT_TIMESTAMP
+                """, (worker_id, date_str, status))
 
     def get_attendance_for_month(self, worker_id, month, year):
+        """Get monthly attendance with optimized query and error checking."""
+        # Validate input
+        if not (1 <= month <= 12 and 1900 <= year <= 9999):
+            raise ValueError("Invalid month or year")
+            
         month_str = f"{year}-{str(month).zfill(2)}"
-        self.cursor.execute("SELECT date, status FROM attendance WHERE worker_id = ? AND strftime('%Y-%m', date) = ?", (worker_id, month_str))
-        return {datetime.strptime(d.split(' ')[0], '%Y-%m-%d').day: s for d, s in self.cursor.fetchall()}
+        
+        # Use indexed columns for better performance
+        query = """
+            SELECT date, status 
+            FROM attendance 
+            WHERE worker_id = ? 
+            AND strftime('%Y-%m', date) = ?
+            AND EXISTS (SELECT 1 FROM workers WHERE id = worker_id AND active = 1)
+        """
+        
+        self.cursor.execute(query, (worker_id, month_str))
+        return {
+            datetime.strptime(d.split(' ')[0], '%Y-%m-%d').day: s 
+            for d, s in self.cursor.fetchall()
+        }
 
-    def add_advance(self, worker_id, amount, date_str):
-        """Add advance payment with validation."""
-        if amount <= 0:
-            raise ValueError("Advance amount must be greater than 0")
+    def add_advance(self, worker_id, amount, date_str, notes=None):
+        """Add advance payment with enhanced validation and error handling."""
+        if not isinstance(amount, (int, float)) or amount <= 0:
+            raise ValueError("Advance amount must be a positive number")
         if amount > 50000:  # Reasonable upper limit
             raise ValueError("Advance amount seems too high (max: ₹50,000)")
             
-        self.cursor.execute("INSERT INTO advances (worker_id, amount, date) VALUES (?, ?, ?)", (worker_id, amount, date_str))
-        self.conn.commit()
+        with self.conn:
+            # Verify worker exists and is active
+            self.cursor.execute("SELECT daily_wage FROM workers WHERE id = ? AND active = 1", (worker_id,))
+            worker = self.cursor.fetchone()
+            if not worker:
+                raise ValueError("Worker not found or inactive")
+                
+            # Check if total advances for the month don't exceed monthly wage
+            daily_wage = worker[0]
+            month_str = datetime.strptime(date_str, '%Y-%m-%d').strftime('%Y-%m')
+            
+            self.cursor.execute("""
+                SELECT COALESCE(SUM(amount), 0) 
+                FROM advances 
+                WHERE worker_id = ? AND strftime('%Y-%m', date) = ?
+            """, (worker_id, month_str))
+            
+            current_advances = self.cursor.fetchone()[0] or 0
+            days_in_month = calendar.monthrange(int(month_str[:4]), int(month_str[5:]))[1]
+            max_possible_wage = daily_wage * days_in_month
+            
+            if current_advances + amount > max_possible_wage:
+                raise ValueError(f"Total advances ({current_advances + amount}) would exceed maximum monthly wage ({max_possible_wage})")
+            
+            # Insert advance with audit trail
+            self.cursor.execute("""
+                INSERT INTO advances (worker_id, amount, date, notes, created_at) 
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (worker_id, amount, date_str, notes))
+            
+            return self.cursor.lastrowid
 
     def get_advances_for_month(self, worker_id, month, year):
+        """Get monthly advances with improved error handling and caching."""
+        if not (1 <= month <= 12 and 1900 <= year <= 9999):
+            raise ValueError("Invalid month or year")
+            
         month_str = f"{year}-{str(month).zfill(2)}"
-        self.cursor.execute("SELECT SUM(amount) FROM advances WHERE worker_id = ? AND strftime('%Y-%m', date) = ?", (worker_id, month_str))
-        result = self.cursor.fetchone()[0]
-        return result if result else 0.0
+        
+        # Use optimized query with worker existence check
+        query = """
+            SELECT COALESCE(SUM(amount), 0) 
+            FROM advances a
+            WHERE a.worker_id = ? 
+            AND strftime('%Y-%m', a.date) = ?
+            AND EXISTS (SELECT 1 FROM workers w WHERE w.id = a.worker_id AND w.active = 1)
+        """
+        
+        self.cursor.execute(query, (worker_id, month_str))
+        return self.cursor.fetchone()[0] or 0.0
 
-    def __del__(self):
+    def get_advance_history(self, worker_id, limit=10):
+        """Get recent advance history for a worker."""
+        query = """
+            SELECT a.date, a.amount, a.notes, a.created_at
+            FROM advances a
+            WHERE a.worker_id = ?
+            ORDER BY a.date DESC, a.created_at DESC
+            LIMIT ?
+        """
+        
+        self.cursor.execute(query, (worker_id, limit))
+        return [dict(zip(['date', 'amount', 'notes', 'created_at'], row)) 
+                for row in self.cursor.fetchall()]
+
+    def __enter__(self):
+        """Enable context manager support."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Clean up resources properly."""
         if hasattr(self, 'conn'):
             try:
+                if exc_type is None:
+                    self.conn.commit()
+                else:
+                    self.conn.rollback()
                 self.conn.close()
             except Exception:
                 pass

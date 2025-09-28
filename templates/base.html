@@ -25,6 +25,22 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='layout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='form-fixes.css') }}">
     
+    <!-- Add custom container styles -->
+    <style>
+        .page-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        .content-wrapper {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+            padding-top: calc(var(--header-height) + var(--spacing-lg));
+        }
+    </style>
+    
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     

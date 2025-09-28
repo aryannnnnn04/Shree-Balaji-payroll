@@ -272,9 +272,41 @@ async function generateReport() {
         
         const data = await response.json();
         
+        // Validate data structure
+        if (!data || typeof data !== 'object') {
+            throw new Error('Invalid response format');
+        }
+        
+        // Common validations
+        if (!data.month || !data.year) {
+            throw new Error('Missing month/year in response');
+        }
+        
+        if (!Array.isArray(data.workers)) {
+            throw new Error('Invalid workers data format');
+        }
+        
         if (reportType === 'payroll') {
+            // Validate payroll summary
+            if (!data.summary || typeof data.summary !== 'object' || 
+                typeof data.summary.total_workers !== 'number' ||
+                typeof data.summary.total_payroll !== 'number' ||
+                typeof data.summary.total_advances !== 'number' ||
+                typeof data.summary.total_net !== 'number') {
+                throw new Error('Invalid payroll summary format');
+            }
             renderPayrollReport(data);
         } else {
+            // Validate attendance summary and holidays
+            if (!data.summary || typeof data.summary !== 'object' ||
+                typeof data.summary.total_days !== 'number' ||
+                typeof data.summary.working_days !== 'number' ||
+                typeof data.summary.holidays !== 'number') {
+                throw new Error('Invalid attendance summary format');
+            }
+            if (!Array.isArray(data.holidays)) {
+                throw new Error('Invalid holidays data format');
+            }
             renderAttendanceReport(data);
         }
         
@@ -306,6 +338,11 @@ function renderPayrollReport(data) {
     const reportContent = document.getElementById('reportContent');
     const summarySection = document.getElementById('summarySection');
     
+    // Additional data validation
+    if (!Array.isArray(data.workers)) {
+        throw new Error('Workers data is not an array');
+    }
+    
     if (data.workers.length === 0) {
         reportContent.innerHTML = `
             <div class="empty-report">
@@ -317,6 +354,27 @@ function renderPayrollReport(data) {
         summarySection.style.display = 'none';
         return;
     }
+    
+    // Validate required fields in worker data
+    data.workers.forEach((worker, index) => {
+        if (!worker || typeof worker !== 'object') {
+            throw new Error(`Invalid worker data at index ${index}`);
+        }
+        if (typeof worker.worker_name !== 'string') {
+            throw new Error(`Missing or invalid worker name at index ${index}`);
+        }
+        if (typeof worker.daily_wage !== 'number') {
+            throw new Error(`Invalid daily wage for worker ${worker.worker_name}`);
+        }
+        if (typeof worker.present_days !== 'number' || 
+            typeof worker.half_days !== 'number' ||
+            typeof worker.total_days !== 'number' ||
+            typeof worker.gross_salary !== 'number' ||
+            typeof worker.advances !== 'number' ||
+            typeof worker.net_salary !== 'number') {
+            throw new Error(`Missing or invalid salary data for worker ${worker.worker_name}`);
+        }
+    });
     
     let tableHTML = `
         <h2>Payroll Report - ${data.month} ${data.year}</h2>
@@ -368,6 +426,23 @@ function renderAttendanceReport(data) {
     const reportContent = document.getElementById('reportContent');
     const summarySection = document.getElementById('summarySection');
     
+    // Additional data validation
+    if (!Array.isArray(data.workers)) {
+        throw new Error('Workers data is not an array');
+    }
+    
+    if (!data.summary || typeof data.summary !== 'object') {
+        throw new Error('Missing or invalid summary data');
+    }
+    
+    // Validate summary data
+    const summaryFields = ['total_days', 'working_days', 'holidays'];
+    summaryFields.forEach(field => {
+        if (typeof data.summary[field] !== 'number') {
+            throw new Error(`Invalid or missing summary field: ${field}`);
+        }
+    });
+    
     if (data.workers.length === 0) {
         reportContent.innerHTML = `
             <div class="empty-report">
@@ -379,6 +454,24 @@ function renderAttendanceReport(data) {
         summarySection.style.display = 'none';
         return;
     }
+    
+    // Validate required fields in worker data
+    data.workers.forEach((worker, index) => {
+        if (!worker || typeof worker !== 'object') {
+            throw new Error(`Invalid worker data at index ${index}`);
+        }
+        if (typeof worker.worker_name !== 'string') {
+            throw new Error(`Missing or invalid worker name at index ${index}`);
+        }
+        if (typeof worker.present_days !== 'number' ||
+            typeof worker.half_days !== 'number' ||
+            typeof worker.absent_days !== 'number' ||
+            typeof worker.holidays !== 'number' ||
+            typeof worker.total_working_days !== 'number' ||
+            typeof worker.attendance_percentage !== 'number') {
+            throw new Error(`Missing or invalid attendance data for worker ${worker.worker_name}`);
+        }
+    });
     
     let tableHTML = `
         <h2>Attendance Report - ${data.month} ${data.year}</h2>
@@ -462,7 +555,24 @@ async function exportReport(type) {
     
     try {
         const response = await fetch(`/api/reports/${type}?month=${month}&year=${year}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch report data');
+        }
+        
         const data = await response.json();
+        
+        // Validate data structure
+        if (!data || typeof data !== 'object') {
+            throw new Error('Invalid response format');
+        }
+        
+        if (!Array.isArray(data.workers)) {
+            throw new Error('Invalid workers data format');
+        }
+        
+        if (data.workers.length === 0) {
+            throw new Error('No data available to export');
+        }
         
         // Create CSV content
         let csvContent = '';

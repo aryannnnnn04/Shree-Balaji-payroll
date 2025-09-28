@@ -3,12 +3,14 @@
 {% block title %}Dashboard - Shree Balaji Centring Works{% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
+<div class="page-container">
     <!-- Pull-to-refresh indicator -->
     <div class="pull-refresh" id="pullRefresh">
         <div class="pull-refresh-icon">↓</div>
         <div class="pull-refresh-text">Pull to refresh</div>
     </div>
+    
+    <div class="content-wrapper">
 
     <!-- Header Section -->
     <div class="dashboard-header">
@@ -1292,7 +1294,7 @@ function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.remove('show', 'active');
-        document.body.style.overflow = 'auto';
+        document.body.classList.remove('modal-open');
         
         // Clear any form data in modals
         const forms = modal.querySelectorAll('form');
@@ -1319,7 +1321,7 @@ function showModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.add('show');
-        document.body.style.overflow = 'hidden';
+        document.body.classList.add('modal-open');
         
         // Set default date for start date if it's the add worker modal
         if (modalId === 'addWorkerModal') {
@@ -1679,4 +1681,7 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', async func
     }
 });
 </script>
+
+    </div><!-- Close content-wrapper -->
+</div><!-- Close page-container -->
 {% endblock %}

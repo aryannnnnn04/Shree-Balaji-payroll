@@ -1,4 +1,6 @@
 import os
+import time
+import threading
 import psycopg2
 import psycopg2.extras # Important for getting dictionary-like results
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
@@ -16,11 +18,46 @@ app = Flask(__name__,
             static_folder=os.path.join(_cwd, '../static'),
             template_folder=os.path.join(_cwd, '../templates'))
 
+# Request performance monitoring
+@app.before_request
+def before_request():
+    """Record start time of request processing."""
+    request.start_time = time.time()
+
+@app.after_request
+def after_request(response):
+    """Log request performance metrics."""
+    if hasattr(request, 'start_time'):
+        elapsed = time.time() - request.start_time
+        logger.info(f"{request.method} {request.path} completed in {elapsed:.2f}s")
+    return response
+
 # --- Configure the Flask app ---
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(16)) # More secure for production
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)  # Session timeout
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Max file size 16MB
+
+# Global error handler
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logger.error(f"Unhandled exception: {str(e)}")
+    return jsonify({'error': 'Internal server error'}), 500
+
+# Add password validation
+def validate_password(password):
+    """Validate password complexity."""
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    if not any(c.isupper() for c in password):
+        return False, "Password must contain at least one uppercase letter"
+    if not any(c.islower() for c in password):
+        return False, "Password must contain at least one lowercase letter"
+    if not any(c.isdigit() for c in password):
+        return False, "Password must contain at least one number"
+    return True, ""
 
 # --- The Rewritten Database Class for PostgreSQL (Neon) ---
 from psycopg2.pool import SimpleConnectionPool
@@ -36,16 +73,50 @@ class Database:
         self.db_url = os.environ.get("POSTGRES_URL")
         if not self.db_url:
             raise Exception("POSTGRES_URL environment variable not set")
-        self._pool = SimpleConnectionPool(1, 20, self.db_url)
-        self.create_tables()
+        self._pool = SimpleConnectionPool(
+            minconn=1,
+            maxconn=20,
+            dsn=self.db_url,
+            connect_timeout=3,  # Connection timeout in seconds
+            keepalives=1,  # Enable TCP keepalive
+            keepalives_idle=30,  # Number of seconds after which TCP should send keepalive
+            keepalives_interval=10,  # Number of seconds between TCP keepalives
+            keepalives_count=5  # Number of TCP keepalives before dropping connection
+        )
+        self._init_db()
+
+    def _init_db(self):
+        """Initialize database and create tables."""
+        retries = 3
+        for attempt in range(retries):
+            try:
+                self.create_tables()
+                return
+            except Exception as e:
+                if attempt == retries - 1:
+                    logger.error(f"Failed to initialize database after {retries} attempts: {e}")
+                    raise
+                logger.warning(f"Database initialization attempt {attempt + 1} failed: {e}")
+                time.sleep(1)  # Wait before retry
 
     def get_connection(self):
-        """Gets a connection from the connection pool."""
-        try:
-            return self._pool.getconn()
-        except Exception as e:
-            logger.error(f"Failed to get database connection: {e}")
-            raise
+        """Gets a connection from the connection pool with retry logic."""
+        retries = 3
+        last_error = None
+        
+        for attempt in range(retries):
+            try:
+                conn = self._pool.getconn()
+                conn.set_session(autocommit=False)  # Explicit transaction management
+                return conn
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Database connection attempt {attempt + 1} failed: {e}")
+                if attempt < retries - 1:
+                    time.sleep(1)  # Wait before retry
+                
+        logger.error(f"Failed to get database connection after {retries} attempts: {last_error}")
+        raise last_error
 
     def create_tables(self):
         """Create the necessary tables if they don't exist."""
@@ -137,16 +208,40 @@ class Database:
         finally: conn.close()
 
     def mark_attendance(self, worker_id, date_str, status):
+        if not worker_id or not date_str:
+            raise ValueError("Worker ID and date are required")
+        if status not in ['Present', 'Half Day', 'Absent', 'unmarked']:
+            raise ValueError("Invalid attendance status")
+
         conn = self.get_connection()
         try:
+            # First verify the worker exists
             with conn.cursor() as cursor:
+                cursor.execute("SELECT id FROM workers WHERE id = %s", (worker_id,))
+                if not cursor.fetchone():
+                    raise ValueError(f"Worker with ID {worker_id} not found")
+
+                # Then handle attendance
                 if status == 'unmarked':
                     cursor.execute("DELETE FROM attendance WHERE worker_id = %s AND date = %s", (worker_id, date_str))
                 else:
-                    cursor.execute("INSERT INTO attendance (worker_id, date, status) VALUES (%s, %s, %s) ON CONFLICT (worker_id, date) DO UPDATE SET status = EXCLUDED.status;", (worker_id, date_str, status))
-            conn.commit()
-        finally: conn.close()
-        return self.is_holiday(date_str)
+                    cursor.execute("""
+                        INSERT INTO attendance (worker_id, date, status) 
+                        VALUES (%s, %s, %s) 
+                        ON CONFLICT (worker_id, date) 
+                        DO UPDATE SET status = EXCLUDED.status
+                        RETURNING id
+                    """, (worker_id, date_str, status))
+                    if not cursor.fetchone():
+                        raise Exception("Failed to update attendance record")
+                conn.commit()
+                return self.is_holiday(date_str)
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error marking attendance: {e}")
+            raise
+        finally:
+            conn.close()
 
     def get_attendance(self, worker_id, year, month):
         """Get attendance records for a specific worker in a given month.
@@ -216,22 +311,96 @@ class Database:
             conn.close()
 
     def add_advance(self, worker_id, amount, date_str, note=''):
-        if amount <= 0: raise ValueError("Advance amount must be greater than 0")
-        if amount > 50000: raise ValueError("Advance amount seems too high (max: ₹50,000)")
+        # Input validation
+        if not worker_id:
+            raise ValueError("Worker ID is required")
+        try:
+            amount = float(amount)  # Convert to float to handle string inputs
+        except (TypeError, ValueError):
+            raise ValueError("Invalid advance amount")
+            
+        if amount <= 0:
+            raise ValueError("Advance amount must be greater than 0")
+        if amount > 50000:
+            raise ValueError("Advance amount seems too high (max: ₹50,000)")
+            
+        if not date_str:
+            raise ValueError("Date is required")
+
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO advances (worker_id, amount, date, note) VALUES (%s, %s, %s, %s)", (worker_id, amount, date_str, note))
-            conn.commit()
-        finally: conn.close()
+                # Verify worker exists
+                cursor.execute("SELECT id FROM workers WHERE id = %s", (worker_id,))
+                if not cursor.fetchone():
+                    raise ValueError(f"Worker with ID {worker_id} not found")
+                
+                # Check total advances for the month to prevent excessive advances
+                month_start = datetime.strptime(date_str, '%Y-%m-%d').replace(day=1).strftime('%Y-%m-%d')
+                month_end = (datetime.strptime(date_str, '%Y-%m-%d').replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                month_end = month_end.strftime('%Y-%m-%d')
+                
+                cursor.execute("""
+                    SELECT COALESCE(SUM(amount), 0) 
+                    FROM advances 
+                    WHERE worker_id = %s AND date BETWEEN %s AND %s
+                """, (worker_id, month_start, month_end))
+                
+                total_advances = cursor.fetchone()[0]
+                if total_advances + amount > 100000:  # ₹100,000 monthly limit
+                    raise ValueError("Total advances for the month would exceed ₹100,000")
+                
+                # Insert the advance
+                cursor.execute("""
+                    INSERT INTO advances (worker_id, amount, date, note) 
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id
+                """, (worker_id, amount, date_str, note))
+                
+                if not cursor.fetchone():
+                    raise Exception("Failed to insert advance record")
+                    
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error adding advance: {e}")
+            raise
+        finally:
+            conn.close()
 
     def delete_worker(self, worker_id):
+        if not worker_id:
+            raise ValueError("Worker ID is required")
+
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM workers WHERE id = %s", (worker_id,))
-            conn.commit()
-        finally: conn.close()
+                # Start transaction
+                cursor.execute("BEGIN")
+                
+                # Verify worker exists
+                cursor.execute("SELECT id FROM workers WHERE id = %s FOR UPDATE", (worker_id,))
+                if not cursor.fetchone():
+                    raise ValueError(f"Worker with ID {worker_id} not found")
+                
+                # Delete attendance records
+                cursor.execute("DELETE FROM attendance WHERE worker_id = %s", (worker_id,))
+                
+                # Delete advances
+                cursor.execute("DELETE FROM advances WHERE worker_id = %s", (worker_id,))
+                
+                # Finally delete the worker
+                cursor.execute("DELETE FROM workers WHERE id = %s RETURNING id", (worker_id,))
+                if not cursor.fetchone():
+                    raise Exception("Failed to delete worker")
+                
+                cursor.execute("COMMIT")
+        except Exception as e:
+            cursor.execute("ROLLBACK")
+            logger.error(f"Error deleting worker: {e}")
+            raise
+        finally:
+            conn.close()
 
     def get_advances(self, worker_id, year, month):
         conn = self.get_connection()
@@ -242,18 +411,58 @@ class Database:
         finally: conn.close()
 
     def update_worker(self, worker_id, name, daily_wage):
-        if not name or not str(name).strip(): raise ValueError("Worker name cannot be empty")
-        if daily_wage <= 0: raise ValueError("Daily wage must be greater than 0")
+        if not worker_id:
+            raise ValueError("Worker ID is required")
+        if not name or not str(name).strip():
+            raise ValueError("Worker name cannot be empty")
+        
+        try:
+            daily_wage = float(daily_wage)  # Convert to float to handle string inputs
+        except (TypeError, ValueError):
+            raise ValueError("Invalid daily wage")
+            
+        if daily_wage <= 0:
+            raise ValueError("Daily wage must be greater than 0")
+        if daily_wage > 5000:  # Reasonable maximum daily wage
+            raise ValueError("Daily wage seems too high (max: ₹5,000)")
+
+        name = str(name).strip()
         conn = self.get_connection()
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-                cursor.execute("SELECT id FROM workers WHERE id = %s", (worker_id,))
-                if not cursor.fetchone(): raise ValueError("Worker not found")
-                cursor.execute("SELECT id FROM workers WHERE LOWER(name) = LOWER(%s) AND id != %s", (name.strip(), worker_id))
-                if cursor.fetchone(): raise ValueError(f"Worker '{name.strip()}' already exists")
-                cursor.execute("UPDATE workers SET name = %s, daily_wage = %s WHERE id = %s", (name.strip(), daily_wage, worker_id))
-            conn.commit()
-        finally: conn.close()
+                # Use transaction to prevent race conditions
+                cursor.execute("BEGIN")
+                
+                # Check if worker exists using FOR UPDATE to lock the row
+                cursor.execute("SELECT id FROM workers WHERE id = %s FOR UPDATE", (worker_id,))
+                if not cursor.fetchone():
+                    raise ValueError("Worker not found")
+                
+                # Check for duplicate names excluding current worker
+                cursor.execute("SELECT id FROM workers WHERE LOWER(name) = LOWER(%s) AND id != %s", (name, worker_id))
+                if cursor.fetchone():
+                    raise ValueError(f"Worker '{name}' already exists")
+                
+                # Update the worker
+                cursor.execute("""
+                    UPDATE workers 
+                    SET name = %s, 
+                        daily_wage = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING id
+                """, (name, daily_wage, worker_id))
+                
+                if not cursor.fetchone():
+                    raise Exception("Failed to update worker")
+                
+                cursor.execute("COMMIT")
+        except Exception as e:
+            cursor.execute("ROLLBACK")
+            logger.error(f"Error updating worker: {e}")
+            raise
+        finally:
+            conn.close()
 
     def add_holiday(self, date_str, name, holiday_type='manual', description=''):
         if not name or not str(name).strip(): raise ValueError("Holiday name cannot be empty")
@@ -301,28 +510,97 @@ class Database:
 db = Database()
 hindu_calendar = HinduCalendar()
 
+# Cleanup on app shutdown
+@app.teardown_appcontext
+def cleanup_db_pool(error):
+    """Cleanup database connections when the app shuts down."""
+    if hasattr(db, '_pool'):
+        db._pool.closeall()
+        logger.info("Database connection pool cleaned up")
+
 from functools import lru_cache
 from datetime import datetime, timedelta
 
 class Cache:
-    """Simple time-based cache implementation"""
+    """Enhanced time-based cache implementation with statistics and LRU eviction"""
     def __init__(self):
         self._cache = {}
         self._timeouts = {}
+        self._max_size = 1000  # Maximum number of cache entries
+        self._hits = 0
+        self._misses = 0
+        self._last_accessed = {}  # For LRU tracking
+        self._lock = threading.Lock()  # Thread safety
 
     def get(self, key: str) -> Optional[any]:
-        if key in self._cache and datetime.now() < self._timeouts[key]:
-            return self._cache[key]
-        return None
+        """Get value from cache with thread safety and metrics."""
+        with self._lock:
+            self.cleanup()  # Clean expired items before access
+            now = datetime.now()
+            
+            if key in self._cache and now < self._timeouts[key]:
+                self._hits += 1
+                self._last_accessed[key] = now
+                return self._cache[key]
+            
+            self._misses += 1
+            return None
 
     def set(self, key: str, value: any, timeout_seconds: int = 300):
-        self._cache[key] = value
-        self._timeouts[key] = datetime.now() + timedelta(seconds=timeout_seconds)
+        """Set value in cache with LRU eviction and thread safety."""
+        with self._lock:
+            self.cleanup()  # Clean expired items before setting new one
+            now = datetime.now()
+            
+            # LRU eviction if cache is full
+            if len(self._cache) >= self._max_size:
+                # Find least recently used item
+                lru_key = min(self._last_accessed.items(), key=lambda x: x[1])[0]
+                self.delete(lru_key)
+            
+            self._cache[key] = value
+            self._timeouts[key] = now + timedelta(seconds=timeout_seconds)
+            self._last_accessed[key] = now
 
     def delete(self, key: str):
-        if key in self._cache:
-            del self._cache[key]
-            del self._timeouts[key]
+        """Delete item from cache with thread safety."""
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+                del self._timeouts[key]
+                if key in self._last_accessed:
+                    del self._last_accessed[key]
+
+    def cleanup(self):
+        """Remove expired cache entries with thread safety."""
+        with self._lock:
+            now = datetime.now()
+            expired_keys = [k for k, v in self._timeouts.items() if now > v]
+            for k in expired_keys:
+                self.delete(k)
+
+    def clear(self):
+        """Clear all cache entries with thread safety."""
+        with self._lock:
+            self._cache.clear()
+            self._timeouts.clear()
+            self._last_accessed.clear()
+            self._hits = 0
+            self._misses = 0
+
+    def get_stats(self):
+        """Get cache performance statistics."""
+        with self._lock:
+            total_requests = self._hits + self._misses
+            hit_rate = (self._hits / total_requests * 100) if total_requests > 0 else 0
+            return {
+                'size': len(self._cache),
+                'max_size': self._max_size,
+                'hits': self._hits,
+                'misses': self._misses,
+                'hit_rate': f"{hit_rate:.2f}%",
+                'items': len(self._cache)
+            }
 
 cache = Cache()
 
@@ -339,6 +617,43 @@ def login_required(f):
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime, timedelta
+
+def validate_api_response(func):
+    """Decorator to validate and standardize API responses."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            elapsed = time.time() - start_time
+            
+            # Add performance metrics to response headers
+            if isinstance(result, tuple):
+                response, status_code = result
+            else:
+                response, status_code = result, 200
+                
+            if isinstance(response, dict):
+                response['metadata'] = {
+                    'timestamp': datetime.now().isoformat(),
+                    'execution_time': f"{elapsed:.3f}s"
+                }
+            
+            return jsonify(response), status_code
+            
+        except ValueError as e:
+            logger.warning(f"Validation error in {func.__name__}: {str(e)}")
+            return jsonify({
+                'error': str(e),
+                'type': 'ValidationError'
+            }), 400
+        except Exception as e:
+            logger.error(f"Error in {func.__name__}: {str(e)}", exc_info=True)
+            return jsonify({
+                'error': 'Internal server error',
+                'type': 'ServerError'
+            }), 500
+    return wrapper
 
 # Store failed login attempts
 login_attempts = {}
@@ -457,14 +772,25 @@ def get_workers_api() -> Response:
         today = date.today()
         
         # Fetch all attendance records for today in a single query
-        attendance_records = {
-            record['worker_id']: record['status'] 
-            for record in db.get_attendance_for_date(today)
-        }
+        attendance_records = {}
+        try:
+            records = db.get_attendance_for_date(today)
+            if records:
+                attendance_records = {
+                    record['worker_id']: record['status'] 
+                    for record in records if record and 'worker_id' in record and 'status' in record
+                }
+        except Exception as e:
+            logger.error(f"Error fetching attendance records: {e}")
+            attendance_records = {}
         
         for worker in workers:
-            status = attendance_records.get(worker['id'])
-            worker['present_today'] = status in ['Present', 'Half Day'] if status else False
+            try:
+                status = attendance_records.get(worker.get('id'))
+                worker['present_today'] = status in ['Present', 'Half Day'] if status else False
+            except Exception as e:
+                logger.error(f"Error processing worker attendance: {e}")
+                worker['present_today'] = False
             # Convert all numeric fields to float for JSON serialization
             worker['daily_wage'] = float(worker['daily_wage'])
             worker['wage'] = float(worker['daily_wage'])  # Backwards compatibility for older clients
